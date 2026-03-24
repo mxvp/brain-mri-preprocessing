@@ -49,7 +49,13 @@ def preprocess_volume(input_path: Path, output_path: Path, device: str = "0"):
         use_gpu=(device != "cpu"),
     )
 
-    preprocessor.run()
+    log_dir = output_path.parent / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"{input_path.stem}.log"
+
+    preprocessor.run(
+        log_file=log_file,
+    )
     log.info(f"Done {input_path.name} -> {output_path.name} ({time.time() - t0:.1f}s)")
 
 
