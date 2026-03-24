@@ -1,0 +1,6 @@
+data/
+logs/
+*.nii
+*.nii.gz
+__pycache__/
+.venv/
