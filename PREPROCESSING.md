@@ -7,7 +7,7 @@ skull-stripped, atlas-registered volumes ready for the GBM-MAE data loader.
 ```
 preprocess.py          # Single-volume preprocessing (wraps brainles-preprocessing)
 preprocess_slurm.sh    # SLURM array job for batch processing on Sherlock
-convert_analyze.py     # Convert Analyze (.hdr/.img) to NIfTI (needed for OASIS-1/2)
+convert.py             # Convert any format to NIfTI (Analyze, MGZ, MINC, DICOM)
 qc.py                  # Render mid-slice PNG grid for visual QC
 pyproject.toml         # Dependencies
 data/                  # Sample volumes for testing
@@ -69,9 +69,10 @@ python preprocess.py input_dir/ output_dir/ --batch
 # CPU only (no GPU)
 python preprocess.py raw.nii.gz output.nii.gz --device cpu
 
-# Convert Analyze format first (OASIS-1/2)
-python convert_analyze.py oasis_raw/ converted/ --batch
-python preprocess.py converted/ output/ --batch
+# Convert non-NIfTI formats first (Analyze, MGZ, MINC, DICOM)
+python convert.py input.hdr output.nii.gz
+python convert.py dicom_dir/ output.nii.gz
+python convert.py input_dir/ output_dir/ --batch
 
 # QC: render mid-slice grid
 python qc.py output/ qc_grid.png
@@ -86,5 +87,5 @@ sbatch preprocess_slurm.sh input_files.txt /path/to/output/
 - Some existing UPenn data has pre-baked z-normalization — this is harmless (double z-score is ~idempotent) but not required.
 - Current training data is T1c (post-contrast). New datasets may be T1w (no contrast) — different intensity distribution but same preprocessing pipeline.
 - Runtime estimate: ~3-8 min per volume (N4: 1-2 min, skull-strip: 10-30s, registration: 2-5 min).
-- OASIS-1/2 ships in Analyze format (.hdr/.img) — convert to NIfTI first with convert_analyze.py.
-- Input must be NIfTI (.nii or .nii.gz). Use convert_analyze.py for Analyze format.
+- Input to preprocess.py must be NIfTI (.nii or .nii.gz). Use convert.py first for Analyze, MGZ, MINC, or DICOM.
+- DICOM conversion requires dcm2niix (check: `which dcm2niix` or `module load dcm2niix`).
