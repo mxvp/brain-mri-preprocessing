@@ -1,12 +1,12 @@
-"""Preprocess a single brain MRI volume for GBM-MAE.
+"""Preprocess brain MRI volumes: N4 + skull-strip + affine registration to SRI24.
 
-Pipeline: N4 bias correction -> skull-stripping (HD-BET) -> affine registration to SRI24.
 Wraps brainles-preprocessing.
 
 Usage:
     python preprocess.py input.nii.gz output.nii.gz
     python preprocess.py input.nii.gz output.nii.gz --device cpu
     python preprocess.py input_dir/ output_dir/ --batch
+    python preprocess.py --filelist files.txt --output output_dir/
 """
 
 import argparse
@@ -59,17 +59,27 @@ def preprocess_volume(input_path: Path, output_path: Path, device: str = "0"):
     log.info(f"Done {input_path.name} -> {output_path.name} ({time.time() - t0:.1f}s)")
 
 
-def preprocess_batch(input_dir: Path, output_dir: Path, device: str = "0"):
+def _output_name(input_path: Path) -> str:
+    name = input_path.name
+    for ext in (".nii.gz", ".nii"):
+        if name.endswith(ext):
+            return name[: -len(ext)] + "_preprocessed.nii.gz"
+    return name + "_preprocessed.nii.gz"
+
+
+def preprocess_batch(files: list[Path], output_dir: Path, device: str = "0"):
     output_dir.mkdir(parents=True, exist_ok=True)
-    files = sorted(input_dir.glob("*.nii*"))
     if not files:
-        log.warning(f"No .nii/.nii.gz files found in {input_dir}")
+        log.warning("No files to process")
         return
 
-    log.info(f"Found {len(files)} volumes in {input_dir}")
+    log.info(f"Processing {len(files)} volumes")
     failed = []
     for i, f in enumerate(files):
-        out = output_dir / f"{f.name.replace('.nii.gz', '').replace('.nii', '')}_preprocessed.nii.gz"
+        out = output_dir / _output_name(f)
+        if out.exists():
+            log.info(f"[{i+1}/{len(files)}] Skipping {f.name} (already exists)")
+            continue
         log.info(f"[{i+1}/{len(files)}] {f.name}")
         try:
             preprocess_volume(f, out, device=device)
@@ -85,9 +95,10 @@ def preprocess_batch(input_dir: Path, output_dir: Path, device: str = "0"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Preprocess brain MRI for GBM-MAE")
-    parser.add_argument("input", type=Path, help="Input .nii.gz file or directory (with --batch)")
-    parser.add_argument("output", type=Path, help="Output .nii.gz file or directory (with --batch)")
+    parser.add_argument("input", nargs="?", type=Path, help="Input .nii.gz file or directory (with --batch)")
+    parser.add_argument("output", type=Path, help="Output .nii.gz file or directory")
     parser.add_argument("--batch", action="store_true", help="Process all .nii* files in input dir")
+    parser.add_argument("--filelist", type=Path, help="Text file with one .nii.gz path per line")
     parser.add_argument("--device", default="0", help="GPU device ID or 'cpu' (default: 0)")
     args = parser.parse_args()
 
@@ -97,7 +108,15 @@ if __name__ == "__main__":
         datefmt="%H:%M:%S",
     )
 
-    if args.batch:
-        preprocess_batch(args.input, args.output, device=args.device)
+    if args.filelist:
+        files = [Path(line.strip()) for line in open(args.filelist) if line.strip()]
+        preprocess_batch(files, args.output, device=args.device)
+    elif args.batch:
+        if not args.input:
+            parser.error("input directory required with --batch")
+        files = sorted(args.input.glob("*.nii*"))
+        preprocess_batch(files, args.output, device=args.device)
     else:
+        if not args.input:
+            parser.error("input file required")
         preprocess_volume(args.input, args.output, device=args.device)

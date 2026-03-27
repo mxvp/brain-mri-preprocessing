@@ -1,4 +1,5 @@
 data/
+staging/
 logs/
 *.nii
 *.nii.gz
