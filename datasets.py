@@ -77,7 +77,7 @@ class OASIS1(Dataset):
     def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
         output_dir.mkdir(parents=True, exist_ok=True)
         results = []
-        for subject_dir in sorted(input_dir.glob("OAS1_*_MR*")):
+        for subject_dir in sorted(input_dir.rglob("OAS1_*_MR*")):
             raw_dir = subject_dir / "RAW"
             if not raw_dir.exists():
                 continue
