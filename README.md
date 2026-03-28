@@ -17,16 +17,17 @@ pyproject.toml         # Dependencies
 
 ## Supported datasets
 
-| Dataset | Format | T1w selection |
-|---------|--------|---------------|
+| Dataset | Format | Selection |
+|---------|--------|-----------|
 | IXI | .nii.gz | `*-T1.nii.gz` |
 | OASIS-1 | Analyze (.hdr/.img) | `RAW/mpr-1` (converted to NIfTI) |
 | OASIS-2 | Analyze (.hdr/.img) | `RAW/mpr-1` (converted to NIfTI) |
 | OASIS-3 | BIDS .nii.gz | `*T1w.nii.gz` |
 | PPMI | DICOM | `*T1*weighted*` / `*MPRAGE*` dirs (converted via dcm2niix) |
 | ADNI | .nii | `T1.nii` per subject |
-| SCHIZO | .nii.gz | `T1.nii.gz` per subject (already skull-stripped) |
-| Stanford | .nii.gz | `T1.nii.gz` per subject (already skull-stripped) |
+| SCHIZO | .nii.gz | `T1.nii.gz` per subject (pre-skull-stripped, raw unavailable) |
+| Stanford | .nii.gz | `T1Gd.nii.gz`, `FLAIR.nii.gz` per subject |
+| TCGA | .nii.gz | `*_t1.nii.gz`, `*_t1Gd.nii.gz`, `*_t2.nii.gz`, `*_flair.nii.gz` |
 
 To add a new dataset: subclass `Dataset` in `datasets.py`, implement `prepare()`, add to `REGISTRY`.
 

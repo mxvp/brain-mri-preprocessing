@@ -1,6 +1,6 @@
-"""Dataset registry for T1w file discovery and format conversion.
+"""Dataset registry for brain MRI file discovery and format conversion.
 
-Each dataset subclass knows how to find T1w files in its specific directory
+Each dataset subclass knows how to find brain MRI files in its specific directory
 structure and convert them to NIfTI if needed. To add a new dataset, subclass
 Dataset and register it in REGISTRY.
 
@@ -202,7 +202,7 @@ class ADNI(Dataset):
 
 
 class Schizo(Dataset):
-    """SCHIZO (data_fusion) — T1.nii.gz per subject, already skull-stripped."""
+    """SCHIZO — COBRE dataset. T1.nii.gz per subject (already skull-stripped, raw unavailable)."""
 
     name = "schizo"
 
@@ -214,24 +214,46 @@ class Schizo(Dataset):
             t1 = subject_dir / "T1.nii.gz"
             if t1.exists():
                 results.append(t1)
-        log.info(f"SCHIZO: found {len(results)} T1w volumes")
+        log.info(f"SCHIZO: found {len(results)} T1w volumes (pre-skull-stripped)")
         return results
 
 
 class Stanford(Dataset):
-    """Stanford (data_fusion) — T1.nii.gz per subject, already skull-stripped."""
+    """Stanford — brain tumor dataset with T1Gd, FLAIR per subject."""
 
     name = "stanford"
+    # Raw modality files (not masks/intermediates)
+    MODALITIES = ["T1Gd.nii.gz", "FLAIR.nii.gz"]
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
         results = []
         for subject_dir in sorted(input_dir.iterdir()):
             if not subject_dir.is_dir():
                 continue
-            t1 = subject_dir / "T1.nii.gz"
-            if t1.exists():
-                results.append(t1)
-        log.info(f"Stanford: found {len(results)} T1w volumes")
+            for mod in self.MODALITIES:
+                f = subject_dir / mod
+                if f.exists():
+                    results.append(f)
+        log.info(f"Stanford: found {len(results)} volumes")
+        return results
+
+
+class TCGA(Dataset):
+    """TCGA — brain tumor dataset with t1, t1Gd, t2, flair per subject."""
+
+    name = "tcga"
+    # Pattern: TCGA-XX-XXXX_date_modality.nii.gz
+    MODALITY_SUFFIXES = ["_t1.nii.gz", "_t1Gd.nii.gz", "_t2.nii.gz", "_flair.nii.gz"]
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
+        results = []
+        for subject_dir in sorted(input_dir.iterdir()):
+            if not subject_dir.is_dir():
+                continue
+            for f in sorted(subject_dir.glob("*.nii.gz")):
+                if any(f.name.endswith(s) for s in self.MODALITY_SUFFIXES):
+                    results.append(f)
+        log.info(f"TCGA: found {len(results)} volumes")
         return results
 
 
@@ -244,4 +266,5 @@ REGISTRY: dict[str, type[Dataset]] = {
     "adni": ADNI,
     "schizo": Schizo,
     "stanford": Stanford,
+    "tcga": TCGA,
 }
