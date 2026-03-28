@@ -134,49 +134,82 @@ class OASIS3(Dataset):
 
 
 class PPMI(Dataset):
-    """PPMI — DICOM, T1w dirs match *T1*weighted* or *MPRAGE*."""
+    """PPMI — DICOM, multiple T1 naming conventions across sites.
+
+    Handles two folder layouts:
+      PPMI/{subject}/{modality}/...           (from zip 1)
+      PPMI2/{subject}/{sub_id}/{modality}/... (from zip 2)
+    """
 
     name = "ppmi"
-    T1_PATTERNS = ["*T1*weighted*", "*T1-weighted*", "*MPRAGE*"]
+    # Keywords that identify T1w structural scans (case-insensitive)
+    T1_KEYWORDS = ["T1", "MPRAGE", "FSPGR", "SPGR", "BRAVO", "FFE", "TFE"]
+    # Keywords to exclude (functional, diffusion, fieldmaps, etc.)
+    EXCLUDE_KEYWORDS = ["FLAIR", "FMRI", "BOLD", "DTI", "DWI", "ASL", "LOC",
+                        "FIELD", "B0", "B1", "GRE-MT", "GRE_MT", "GRE-NM",
+                        "CALIBRATION", "SCOUT", "SETTER", "SCREEN"]
 
     def _is_t1_dir(self, name: str) -> bool:
-        name_upper = name.upper()
-        return any(fnmatch(name_upper, p.upper()) for p in self.T1_PATTERNS)
+        upper = name.upper()
+        if any(kw in upper for kw in self.EXCLUDE_KEYWORDS):
+            return False
+        return any(kw in upper for kw in self.T1_KEYWORDS)
+
+    def _process_modality_dirs(self, subject_id: str, parent_dir: Path,
+                                output_dir: Path, results: list[Path]):
+        t1_dirs = [d for d in parent_dir.iterdir() if d.is_dir() and self._is_t1_dir(d.name)]
+        if not t1_dirs:
+            return
+
+        for t1_dir in sorted(t1_dirs):
+            for date_dir in sorted(t1_dir.iterdir()):
+                if not date_dir.is_dir():
+                    continue
+                dcm_dirs = [d for d in date_dir.iterdir()
+                            if d.is_dir() and list(d.glob("*.dcm"))[:1]]
+                if not dcm_dirs:
+                    continue
+
+                dcm_dir = dcm_dirs[0]
+                date_str = date_dir.name[:10].replace("-", "")
+                filename = f"PPMI_{subject_id}_{date_str}"
+                out = output_dir / f"{filename}.nii.gz"
+
+                if not out.exists():
+                    try:
+                        _dcm2niix(dcm_dir, output_dir, filename)
+                    except Exception:
+                        log.exception(f"PPMI {subject_id} {date_dir.name}")
+                        continue
+                if out.exists():
+                    results.append(out)
+
+    def _scan_root(self, root: Path, output_dir: Path, results: list[Path]):
+        for subject_dir in sorted(root.iterdir()):
+            if not subject_dir.is_dir():
+                continue
+            subject_id = subject_dir.name
+
+            # Check if this has extra nesting (PPMI2 layout: subject/{sub_id}/{modality})
+            subdirs = [d for d in subject_dir.iterdir() if d.is_dir()]
+            if subdirs and all(d.name.isdigit() for d in subdirs[:5]):
+                for sub_dir in sorted(subdirs):
+                    self._process_modality_dirs(subject_id, sub_dir, output_dir, results)
+            else:
+                self._process_modality_dirs(subject_id, subject_dir, output_dir, results)
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
         output_dir.mkdir(parents=True, exist_ok=True)
         results = []
 
-        for subject_dir in sorted(input_dir.iterdir()):
-            if not subject_dir.is_dir():
-                continue
-            subject_id = subject_dir.name
-
-            t1_dirs = [d for d in subject_dir.iterdir() if d.is_dir() and self._is_t1_dir(d.name)]
-            if not t1_dirs:
-                continue
-
-            for t1_dir in sorted(t1_dirs):
-                for date_dir in sorted(t1_dir.iterdir()):
-                    if not date_dir.is_dir():
-                        continue
-                    dcm_dirs = [d for d in date_dir.iterdir() if d.is_dir() and list(d.glob("*.dcm"))[:1]]
-                    if not dcm_dirs:
-                        continue
-
-                    dcm_dir = dcm_dirs[0]
-                    date_str = date_dir.name[:10].replace("-", "")
-                    filename = f"PPMI_{subject_id}_{date_str}"
-                    out = output_dir / f"{filename}.nii.gz"
-
-                    if not out.exists():
-                        try:
-                            _dcm2niix(dcm_dir, output_dir, filename)
-                        except Exception:
-                            log.exception(f"PPMI {subject_id} {date_dir.name}")
-                            continue
-                    if out.exists():
-                        results.append(out)
+        # Handle multiple subdirs (PPMI/, PPMI2/) or direct subject dirs
+        subdirs = sorted(d for d in input_dir.iterdir() if d.is_dir())
+        if subdirs and subdirs[0].name.startswith("PPMI"):
+            for sub_root in subdirs:
+                log.info(f"Scanning {sub_root.name}/")
+                self._scan_root(sub_root, output_dir, results)
+        else:
+            self._scan_root(input_dir, output_dir, results)
 
         log.info(f"PPMI: {len(results)} T1w volumes")
         return results
