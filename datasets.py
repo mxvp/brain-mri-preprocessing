@@ -165,12 +165,11 @@ class PPMI(Dataset):
             for date_dir in sorted(t1_dir.iterdir()):
                 if not date_dir.is_dir():
                     continue
-                dcm_dirs = [d for d in date_dir.iterdir()
-                            if d.is_dir() and list(d.glob("*.dcm"))[:1]]
+                dcm_dirs = [d for d in date_dir.iterdir() if d.is_dir()]
                 if not dcm_dirs:
                     continue
 
-                dcm_dir = dcm_dirs[0]
+                dcm_dir = dcm_dirs[0]  # contains .dcm files
                 date_str = date_dir.name[:10].replace("-", "")
                 filename = f"PPMI_{subject_id}_{date_str}"
                 out = output_dir / f"{filename}.nii.gz"
