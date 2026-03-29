@@ -205,8 +205,14 @@ class PPMI(Dataset):
         subdirs = sorted(d for d in input_dir.iterdir() if d.is_dir())
         if subdirs and subdirs[0].name.startswith("PPMI"):
             for sub_root in subdirs:
-                log.info(f"Scanning {sub_root.name}/")
-                self._scan_root(sub_root, output_dir, results)
+                # PPMI2/PPMI/{subjects} — unwrap extra PPMI dir if present
+                inner = sub_root / "PPMI"
+                if inner.is_dir():
+                    log.info(f"Scanning {sub_root.name}/PPMI/")
+                    self._scan_root(inner, output_dir, results)
+                else:
+                    log.info(f"Scanning {sub_root.name}/")
+                    self._scan_root(sub_root, output_dir, results)
         else:
             self._scan_root(input_dir, output_dir, results)
 
