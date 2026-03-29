@@ -59,13 +59,16 @@ class Dataset(ABC):
 
 
 class IXI(Dataset):
-    """IXI dataset — raw T1w .nii.gz, filename contains '-T1'."""
+    """IXI dataset — raw .nii.gz, structural modalities (T1, T2) in filename."""
 
     name = "ixi"
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
-        files = sorted(input_dir.glob("*-T1.nii.gz"))
-        log.info(f"IXI: found {len(files)} T1w volumes")
+        files = sorted(
+            f for f in input_dir.glob("*.nii.gz")
+            if "-T1." in f.name or "-T2." in f.name
+        )
+        log.info(f"IXI: found {len(files)} structural volumes")
         return files
 
 
@@ -142,27 +145,33 @@ class PPMI(Dataset):
     """
 
     name = "ppmi"
-    # Keywords that identify T1w structural scans (case-insensitive)
-    T1_KEYWORDS = ["T1", "MPRAGE", "FSPGR", "SPGR", "BRAVO", "FFE", "TFE"]
-    # Keywords to exclude (functional, diffusion, fieldmaps, etc.)
-    EXCLUDE_KEYWORDS = ["FLAIR", "FMRI", "BOLD", "DTI", "DWI", "ASL", "LOC",
+    # Structural modality keywords (case-insensitive)
+    STRUCTURAL_KEYWORDS = [
+        "T1", "MPRAGE", "FSPGR", "SPGR", "BRAVO", "FFE", "TFE",  # T1 variants
+        "T2", "FLAIR",                                              # T2/FLAIR
+    ]
+    # Keywords to exclude (functional, diffusion, fieldmaps, localizers, etc.)
+    EXCLUDE_KEYWORDS = ["FMRI", "BOLD", "REST", "DTI", "DWI", "ASL", "LOC",
                         "FIELD", "B0", "B1", "GRE-MT", "GRE_MT", "GRE-NM",
-                        "CALIBRATION", "SCOUT", "SETTER", "SCREEN"]
+                        "GRE_-_MT", "GRE-NMMT", "CALIBRATION", "SCOUT",
+                        "SETTER", "SCREEN", "PLANE"]
 
-    def _is_t1_dir(self, name: str) -> bool:
+    def _is_structural_dir(self, name: str) -> bool:
         upper = name.upper()
         if any(kw in upper for kw in self.EXCLUDE_KEYWORDS):
             return False
-        return any(kw in upper for kw in self.T1_KEYWORDS)
+        return any(kw in upper for kw in self.STRUCTURAL_KEYWORDS)
 
     def _process_modality_dirs(self, subject_id: str, parent_dir: Path,
                                 output_dir: Path, results: list[Path]):
-        t1_dirs = [d for d in parent_dir.iterdir() if d.is_dir() and self._is_t1_dir(d.name)]
-        if not t1_dirs:
+        struct_dirs = [d for d in parent_dir.iterdir() if d.is_dir() and self._is_structural_dir(d.name)]
+        if not struct_dirs:
             return
 
-        for t1_dir in sorted(t1_dirs):
-            for date_dir in sorted(t1_dir.iterdir()):
+        for struct_dir in sorted(struct_dirs):
+            # Sanitize modality name for filename
+            modality = struct_dir.name.replace(" ", "_").replace("-", "_").lower()
+            for date_dir in sorted(struct_dir.iterdir()):
                 if not date_dir.is_dir():
                     continue
                 dcm_dirs = [d for d in date_dir.iterdir() if d.is_dir()]
@@ -171,7 +180,7 @@ class PPMI(Dataset):
 
                 dcm_dir = dcm_dirs[0]  # contains .dcm files
                 date_str = date_dir.name[:10].replace("-", "")
-                filename = f"PPMI_{subject_id}_{date_str}"
+                filename = f"PPMI_{subject_id}_{modality}_{date_str}"
                 out = output_dir / f"{filename}.nii.gz"
 
                 if not out.exists():
@@ -240,19 +249,21 @@ class ADNI(Dataset):
 
 
 class Schizo(Dataset):
-    """SCHIZO — COBRE dataset. T1.nii.gz per subject (already skull-stripped, raw unavailable)."""
+    """SCHIZO — COBRE dataset. T1/T2 per subject (already skull-stripped, raw unavailable)."""
 
     name = "schizo"
+    MODALITIES = ["T1.nii.gz", "T2.nii.gz"]
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
         results = []
         for subject_dir in sorted(input_dir.iterdir()):
             if not subject_dir.is_dir():
                 continue
-            t1 = subject_dir / "T1.nii.gz"
-            if t1.exists():
-                results.append(t1)
-        log.info(f"SCHIZO: found {len(results)} T1w volumes (pre-skull-stripped)")
+            for mod in self.MODALITIES:
+                f = subject_dir / mod
+                if f.exists():
+                    results.append(f)
+        log.info(f"SCHIZO: found {len(results)} volumes (pre-skull-stripped)")
         return results
 
 
@@ -295,6 +306,36 @@ class TCGA(Dataset):
         return results
 
 
+class UCSF(Dataset):
+    """UCSF-PDGM — already registered to SRI24. Structural modalities with bias correction."""
+
+    name = "ucsf"
+    # Prefer bias-corrected versions, all structural modalities
+    MODALITIES = ["_T1_bias.nii.gz", "_T1c_bias.nii.gz", "_T2_bias.nii.gz", "_FLAIR_bias.nii.gz"]
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
+        results = []
+        for subject_dir in sorted(input_dir.iterdir()):
+            if not subject_dir.is_dir():
+                continue
+            for mod in self.MODALITIES:
+                matches = sorted(subject_dir.glob(f"*{mod}"))
+                results.extend(matches)
+        log.info(f"UCSF: found {len(results)} volumes (already in SRI24)")
+        return results
+
+
+class UPenn(Dataset):
+    """UPenn-GBM — already fully preprocessed (N4 + registered + skull-stripped)."""
+
+    name = "upenn"
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
+        files = sorted(input_dir.glob("*_t1.nii.gz"))
+        log.info(f"UPenn: found {len(files)} volumes (already preprocessed)")
+        return files
+
+
 REGISTRY: dict[str, type[Dataset]] = {
     "ixi": IXI,
     "oasis1": OASIS1,
@@ -305,4 +346,6 @@ REGISTRY: dict[str, type[Dataset]] = {
     "schizo": Schizo,
     "stanford": Stanford,
     "tcga": TCGA,
+    "ucsf": UCSF,
+    "upenn": UPenn,
 }
