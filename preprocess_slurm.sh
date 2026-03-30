@@ -16,6 +16,10 @@
 INPUT_LIST=$1
 OUTPUT_DIR=$2
 
+# Activate venv
+cd <sanitized>/projects/brain-mri-preprocessing
+source .venv/bin/activate
+
 mkdir -p "$OUTPUT_DIR" logs
 
 # Get the file for this array task (files.txt is 1-indexed)
