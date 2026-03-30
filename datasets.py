@@ -48,9 +48,22 @@ def _oasis_analyze_to_nifti(hdr_path: Path, output_path: Path):
     arr_ras = np.transpose(arr, (2, 1, 0)).astype(np.float32).copy()
     spacing = (img.spacing[2], img.spacing[1], img.spacing[0])
 
+    # Center our volume on SRI24's center for reliable registration initialization
+    # SRI24 center: (119, -120, 77.5) with direction [[-1,0,0],[0,-1,0],[0,0,1]]
+    sri24_center = (
+        atlas.origin[0] + atlas.direction[0][0] * atlas.shape[0] / 2 * atlas.spacing[0],
+        atlas.origin[1] + atlas.direction[1][1] * atlas.shape[1] / 2 * atlas.spacing[1],
+        atlas.origin[2] + atlas.direction[2][2] * atlas.shape[2] / 2 * atlas.spacing[2],
+    )
+    origin = (
+        sri24_center[0] - atlas.direction[0][0] * arr_ras.shape[0] / 2 * spacing[0],
+        sri24_center[1] - atlas.direction[1][1] * arr_ras.shape[1] / 2 * spacing[1],
+        sri24_center[2] - atlas.direction[2][2] * arr_ras.shape[2] / 2 * spacing[2],
+    )
+
     new_img = ants.from_numpy(
         arr_ras,
-        origin=(arr_ras.shape[0] * spacing[0], 0, 0),
+        origin=origin,
         spacing=spacing,
         direction=atlas.direction,
     )
