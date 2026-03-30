@@ -5,7 +5,7 @@ where T1 is registered to atlas and other modalities (T2, FLAIR) are co-register
 through T1.
 
 Usage:
-    python preprocess.py --manifest manifest.json --output output_dir/
+    python preprocess.py --manifest manifest.json output_dir/
     python preprocess.py input.nii.gz output.nii.gz
     python preprocess.py input.nii.gz output.nii.gz --device cpu
 """
