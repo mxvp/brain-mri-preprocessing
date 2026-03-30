@@ -18,4 +18,4 @@ cd <sanitized>/projects/brain-mri-preprocessing
 source .venv/bin/activate
 mkdir -p "$OUTPUT_DIR" logs
 
-python preprocess.py --filelist "$FILELIST" --output "$OUTPUT_DIR"
+python preprocess.py --filelist "$FILELIST" "$OUTPUT_DIR"
