@@ -4,7 +4,7 @@
 
 mkdir -p logs
 
-for ds in ixi oasis1 oasis2 adni stanford tcga schizo upenn; do
+for ds in ixi oasis1 oasis2 adni stanford tcga schizo upenn ppmi; do
   MANIFEST="data/staging/$ds/manifest.json"
   if [ ! -f "$MANIFEST" ]; then
     echo "SKIP $ds: no manifest.json"
