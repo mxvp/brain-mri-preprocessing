@@ -42,12 +42,8 @@ def _clip_negatives(path: Path) -> Path:
     return path
 
 
-def _output_name(input_path: Path) -> str:
-    name = input_path.name
-    for ext in (".nii.gz", ".nii"):
-        if name.endswith(ext):
-            return name[: -len(ext)] + "_preprocessed.nii.gz"
-    return name + "_preprocessed.nii.gz"
+def _output_name(subject_id: str, modality: str) -> str:
+    return f"{subject_id}_{modality}_preprocessed.nii.gz"
 
 
 def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
@@ -61,8 +57,8 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # Check if all outputs already exist
-    center_out = output_dir / _output_name(Path(center_info["path"]))
-    moving_outs = [output_dir / _output_name(Path(m["path"])) for m in moving_info]
+    center_out = output_dir / _output_name(subject_id, center_info["modality"])
+    moving_outs = [output_dir / _output_name(subject_id, m["modality"]) for m in moving_info]
     if center_out.exists() and all(o.exists() for o in moving_outs):
         log.info(f"Skipping {subject_id} (all outputs exist)")
         return
