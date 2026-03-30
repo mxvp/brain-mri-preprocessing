@@ -1,15 +1,16 @@
-"""Find and prepare T1w files from a dataset for preprocessing.
+"""Find and prepare brain MRI files from a dataset for preprocessing.
 
-Handles per-dataset file discovery and format conversion (Analyze, DICOM -> NIfTI).
-Outputs a file list ready for preprocess.py or preprocess_slurm.sh.
+Handles per-dataset file discovery, format conversion, and subject grouping.
+Outputs a manifest.json with per-subject center + moving modalities.
 
 Usage:
     python prepare.py ixi data/IXI staging/IXI
-    python prepare.py ppmi data/PPMI/PPMI staging/PPMI
+    python prepare.py ppmi data/PPMI staging/PPMI
     python prepare.py --list
 """
 
 import argparse
+import json
 import logging
 from pathlib import Path
 
@@ -19,7 +20,7 @@ log = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Prepare T1w files from a dataset")
+    parser = argparse.ArgumentParser(description="Prepare brain MRI files from a dataset")
     parser.add_argument("dataset", nargs="?", help=f"Dataset name: {', '.join(REGISTRY.keys())}")
     parser.add_argument("input", nargs="?", type=Path, help="Input directory (dataset root)")
     parser.add_argument("output", nargs="?", type=Path, help="Output directory for prepared files")
@@ -46,14 +47,13 @@ if __name__ == "__main__":
         parser.error(f"Unknown dataset '{args.dataset}'. Use --list to see options.")
 
     dataset = REGISTRY[args.dataset]()
-    files = dataset.prepare(args.input, args.output)
+    subjects = dataset.prepare(args.input, args.output)
 
-    filelist = args.output / "files.txt"
     args.output.mkdir(parents=True, exist_ok=True)
-    with open(filelist, "w") as f:
-        for p in files:
-            f.write(f"{p.resolve()}\n")
+    manifest = args.output / "manifest.json"
+    with open(manifest, "w") as f:
+        json.dump(subjects, f, indent=2)
 
-    log.info(f"Wrote {len(files)} paths to {filelist}")
-    log.info(f"Next: python preprocess.py {args.output} <output_dir> --batch")
-    log.info(f"  or: sbatch preprocess_slurm.sh {filelist} <output_dir>")
+    total_volumes = sum(1 + len(s["moving"]) for s in subjects)
+    log.info(f"Wrote {len(subjects)} subjects ({total_volumes} volumes) to {manifest}")
+    log.info(f"Next: python preprocess.py --manifest {manifest} --output <output_dir>")

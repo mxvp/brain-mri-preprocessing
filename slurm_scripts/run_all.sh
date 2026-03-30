@@ -5,12 +5,12 @@
 mkdir -p logs
 
 for ds in ixi oasis1 oasis2 adni stanford tcga schizo upenn; do
-  FILELIST="data/staging/$ds/files.txt"
-  if [ ! -f "$FILELIST" ]; then
-    echo "SKIP $ds: no files.txt"
+  MANIFEST="data/staging/$ds/manifest.json"
+  if [ ! -f "$MANIFEST" ]; then
+    echo "SKIP $ds: no manifest.json"
     continue
   fi
-  N=$(cat "$FILELIST" | wc -l | tr -d ' ')
-  echo "Submitting $ds: $N volumes"
-  sbatch --job-name="preproc-$ds" slurm_scripts/preprocess.sh "$FILELIST" "data/preprocessed/$ds/"
+  N=$(python -c "import json; print(len(json.load(open('$MANIFEST'))))")
+  echo "Submitting $ds: $N subjects"
+  sbatch --job-name="preproc-$ds" slurm_scripts/preprocess.sh "$MANIFEST" "data/preprocessed/$ds/"
 done

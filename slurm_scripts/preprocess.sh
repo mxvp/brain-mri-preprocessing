@@ -9,13 +9,13 @@
 #SBATCH --error=logs/%x_%j.err
 
 # Usage:
-#   sbatch --job-name=preproc-ixi slurm_scripts/preprocess.sh data/staging/ixi/files.txt data/preprocessed/ixi/
+#   sbatch --job-name=preproc-ixi slurm_scripts/preprocess.sh data/staging/ixi/manifest.json data/preprocessed/ixi/
 
-FILELIST=$1
+MANIFEST=$1
 OUTPUT_DIR=$2
 
 cd <sanitized>/projects/brain-mri-preprocessing
 source .venv/bin/activate
 mkdir -p "$OUTPUT_DIR" logs
 
-python preprocess.py --filelist "$FILELIST" "$OUTPUT_DIR"
+python preprocess.py --manifest "$MANIFEST" --output "$OUTPUT_DIR"
