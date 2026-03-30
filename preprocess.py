@@ -5,8 +5,8 @@ where T1 is registered to atlas and other modalities (T2, FLAIR) are co-register
 through T1.
 
 Usage:
-    python preprocess.py --manifest manifest.json output_dir/
-    python preprocess.py input.nii.gz output.nii.gz
+    python preprocess.py --manifest manifest.json --output output_dir/
+    python preprocess.py input.nii.gz --output output.nii.gz
     python preprocess.py input.nii.gz output.nii.gz --device cpu
 """
 
@@ -151,7 +151,7 @@ def preprocess_volume(input_path: Path, output_path: Path, device: str = "0"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Preprocess brain MRI")
     parser.add_argument("input", nargs="?", type=Path, help="Input .nii.gz file")
-    parser.add_argument("output", nargs="?", type=Path, help="Output .nii.gz file or directory")
+    parser.add_argument("--output", "-o", type=Path, help="Output directory or file")
     parser.add_argument("--manifest", type=Path, help="manifest.json from prepare.py")
     parser.add_argument("--device", default="0", help="GPU device ID or 'cpu' (default: 0)")
     args = parser.parse_args()
@@ -168,7 +168,7 @@ if __name__ == "__main__":
         preprocess_manifest(args.manifest, args.output, device=args.device)
     elif args.input:
         if not args.output:
-            parser.error("output path required")
+            parser.error("--output required")
         preprocess_volume(args.input, args.output, device=args.device)
     else:
         parser.error("Provide --manifest or input file")

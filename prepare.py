@@ -56,4 +56,4 @@ if __name__ == "__main__":
 
     total_volumes = sum(1 + len(s["moving"]) for s in subjects)
     log.info(f"Wrote {len(subjects)} subjects ({total_volumes} volumes) to {manifest}")
-    log.info(f"Next: python preprocess.py --manifest {manifest} <output_dir>")
+    log.info(f"Next: python preprocess.py --manifest {manifest} --output <output_dir>")
