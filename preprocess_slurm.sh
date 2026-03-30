@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=mri-preprocess
-#SBATCH --partition=gpu
+#SBATCH <sanitized>
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
