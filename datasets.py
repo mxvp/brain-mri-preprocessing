@@ -326,14 +326,21 @@ class UCSF(Dataset):
 
 
 class UPenn(Dataset):
-    """UPenn-GBM — already fully preprocessed (N4 + registered + skull-stripped)."""
+    """UPenn-GBM — raw structural NIfTI: T1, T1GD, T2, FLAIR per subject."""
 
     name = "upenn"
+    MODALITY_SUFFIXES = ["_T1.nii.gz", "_T1GD.nii.gz", "_T2.nii.gz", "_FLAIR.nii.gz"]
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[Path]:
-        files = sorted(input_dir.glob("*_t1.nii.gz"))
-        log.info(f"UPenn: found {len(files)} volumes (already preprocessed)")
-        return files
+        results = []
+        for subject_dir in sorted(input_dir.iterdir()):
+            if not subject_dir.is_dir():
+                continue
+            for f in sorted(subject_dir.glob("*.nii.gz")):
+                if any(f.name.endswith(s) for s in self.MODALITY_SUFFIXES):
+                    results.append(f)
+        log.info(f"UPenn: found {len(results)} volumes")
+        return results
 
 
 REGISTRY: dict[str, type[Dataset]] = {
