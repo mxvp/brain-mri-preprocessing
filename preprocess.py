@@ -105,7 +105,7 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
     preprocessor.run(log_file=log_dir / f"{subject_id}.log")
 
     # Clean up temp clipped files
-    for p in [center_path] + [Path(m["path"]) for m in moving_info]:
+    for p in [Path(center_info["path"])] + [Path(m["path"]) for m in moving_info]:
         cleaned = p.parent / f"_cleaned_{p.name}"
         if cleaned.exists():
             cleaned.unlink()
