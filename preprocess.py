@@ -30,8 +30,16 @@ def preprocess_volume(input_path: Path, output_path: Path, device: str = "0"):
     log.info(f"Processing {input_path.name}")
     t0 = time.time()
 
+    # Infer modality from filename for logging
+    stem = input_path.stem.lower()
+    modality = "t1"
+    for m in ("flair", "t1gd", "t1cd", "t1c", "t1_gd", "t2", "t1"):
+        if m in stem:
+            modality = m
+            break
+
     center = CenterModality(
-        modality_name="t1",
+        modality_name=modality,
         input_path=input_path,
         n4_bias_correction=True,
         raw_bet_output_path=output_path,
