@@ -30,27 +30,34 @@ def _oasis_analyze_to_nifti(hdr_path: Path, output_path: Path):
     """Convert OASIS Analyze (.hdr/.img) to NIfTI with correct orientation.
 
     OASIS-1/2 sagittal MPRAGE data is stored as (SI, AP, LR) but the Analyze
-    header misreports the orientation. We permute axes to (LR, AP, SI) and set
-    the direction matrix to match SRI24 conventions so ANTs registration
-    initializes correctly.
+    header misreports the orientation. We permute axes, set correct metadata,
+    and pre-register to SRI24 using direct ANTs (brainles registration doesn't
+    converge well from the Analyze starting position).
     """
+    # Load SRI24 atlas from brainles installation
+    import brainles_preprocessing.registration as _reg
+    sri24_paths = list(Path(_reg.__file__).parent.rglob("sri24.nii"))
+    if not sri24_paths:
+        raise RuntimeError("SRI24 atlas not found. Run brainles once to download it.")
+    atlas = ants.image_read(str(sri24_paths[0]))
+
     img = ants.image_read(str(hdr_path))
     arr = img.numpy()  # (256, 256, 128) = (SI, AP, LR)
 
     # Permute to (LR, AP, SI)
     arr_ras = np.transpose(arr, (2, 1, 0)).astype(np.float32).copy()
-
-    # SRI24 direction: [[-1,0,0],[0,-1,0],[0,0,1]]
-    sri24_direction = np.array([[-1, 0, 0], [0, -1, 0], [0, 0, 1]], dtype=float)
     spacing = (img.spacing[2], img.spacing[1], img.spacing[0])
 
     new_img = ants.from_numpy(
         arr_ras,
         origin=(arr_ras.shape[0] * spacing[0], 0, 0),
         spacing=spacing,
-        direction=sri24_direction,
+        direction=atlas.direction,
     )
-    ants.image_write(new_img, str(output_path))
+
+    # Pre-register to SRI24 — direct ANTs handles this reliably
+    result = ants.registration(fixed=atlas, moving=new_img, type_of_transform="Affine")
+    ants.image_write(result["warpedmovout"], str(output_path))
 
 
 def _dcm2niix(dicom_dir: Path, output_dir: Path, filename: str) -> Path:
