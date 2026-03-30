@@ -6,7 +6,7 @@ Usage:
     python preprocess.py input.nii.gz output.nii.gz
     python preprocess.py input.nii.gz output.nii.gz --device cpu
     python preprocess.py input_dir/ output_dir/ --batch
-    python preprocess.py --filelist files.txt --output output_dir/
+    python preprocess.py --filelist files.txt output_dir/
 """
 
 import argparse
