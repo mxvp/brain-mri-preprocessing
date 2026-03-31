@@ -44,8 +44,8 @@ def _oasis_analyze_to_nifti(hdr_path: Path, output_path: Path):
     img = ants.image_read(str(hdr_path))
     arr = img.numpy()  # (256, 256, 128) = (SI, AP, LR)
 
-    # Permute to (LR, AP, SI)
-    arr_ras = np.transpose(arr, (2, 1, 0)).astype(np.float32).copy()
+    # Permute to (LR, AP, SI) and flip Y/Z to match SRI24 axis directions
+    arr_ras = np.transpose(arr, (2, 1, 0))[:, ::-1, ::-1].astype(np.float32).copy()
     spacing = (img.spacing[2], img.spacing[1], img.spacing[0])
 
     # Center our volume on SRI24's center for reliable registration initialization
