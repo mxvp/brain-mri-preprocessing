@@ -22,7 +22,7 @@ from brainles_preprocessing.brain_extraction import HDBetExtractor
 from brainles_preprocessing.constants import Atlas
 from brainles_preprocessing.modality import CenterModality, Modality
 from brainles_preprocessing.n4_bias_correction import SitkN4BiasCorrector
-from brainles_preprocessing.preprocessor import AtlasCentricPreprocessor
+from brainles_preprocessing.preprocessor import AtlasCentricPreprocessor, NativeSpacePreprocessor
 from brainles_preprocessing.registration import ANTsRegistrator
 
 
@@ -40,6 +40,37 @@ def _clip_negatives(path: Path) -> Path:
         log.info(f"Clipped negatives in {path.name}")
         return cleaned
     return path
+
+
+def _com_align(input_path: Path, atlas_enum) -> Path:
+    """Create a copy with origin shifted so brain CoM aligns with atlas CoM.
+    Returns path to the aligned copy (caller should clean up)."""
+    import ants
+    import brainles_preprocessing.registration as _reg
+
+    atlas_name = {Atlas.SRI24: "sri24.nii", Atlas.SRI24_SKULLSTRIPPED: "sri24_skullstripped.nii"}
+    atlas_paths = list(Path(_reg.__file__).parent.rglob(atlas_name.get(atlas_enum, "sri24.nii")))
+    if not atlas_paths:
+        log.warning("Atlas not found for CoM alignment, skipping")
+        return input_path
+    atlas = ants.image_read(str(atlas_paths[0]))
+    moving = ants.image_read(str(input_path))
+
+    def _phys_com(img):
+        arr = img.numpy()
+        thresh = np.percentile(arr[arr > 0], 10) if arr.max() > 0 else 0
+        com_vox = np.argwhere(arr > thresh).mean(axis=0)
+        direction = np.array(img.direction).reshape(3, 3)
+        return np.array(img.origin) + direction @ (com_vox * np.array(img.spacing))
+
+    shift = _phys_com(atlas) - _phys_com(moving)
+    new_origin = [moving.origin[i] + shift[i] for i in range(3)]
+    moving.set_origin(new_origin)
+
+    aligned = input_path.parent / f"_com_aligned_{input_path.name}"
+    ants.image_write(moving, str(aligned))
+    log.info(f"CoM aligned {input_path.name} (shift: [{shift[0]:.1f}, {shift[1]:.1f}, {shift[2]:.1f}])")
+    return aligned
 
 
 def _output_name(subject_id: str, modality: str) -> str:
@@ -86,25 +117,71 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
             raw_bet_output_path=m_out,
         ))
 
-    preprocessor = AtlasCentricPreprocessor(
-        center_modality=center,
-        moving_modalities=moving,
-        registrator=ANTsRegistrator(
-            registration_params={"type_of_transform": "Affine"}
-        ),
-        brain_extractor=HDBetExtractor(),
-        n4_bias_corrector=SitkN4BiasCorrector(),
-        atlas_image_path=Atlas.SRI24,
-        use_gpu=(device != "cpu"),
-    )
+    pre_registered = subject.get("pre_registered", False)
+    pre_skull_stripped = subject.get("pre_skull_stripped", False)
+
+    if pre_registered:
+        # Already in SRI24 space (e.g. OASIS) — skip atlas registration
+        preprocessor = NativeSpacePreprocessor(
+            center_modality=center,
+            moving_modalities=moving,
+            brain_extractor=None if pre_skull_stripped else HDBetExtractor(),
+            n4_bias_corrector=SitkN4BiasCorrector(),
+            use_gpu=(device != "cpu"),
+        )
+    elif pre_skull_stripped:
+        # Already skull-stripped but needs atlas registration (e.g. SCHIZO)
+        # CoM-align for better registration convergence
+        # Use raw_skull_output_path (not raw_bet) to skip brain extraction
+        aligned_center = _com_align(center_path, Atlas.SRI24_SKULLSTRIPPED)
+        center = CenterModality(
+            modality_name=center_info["modality"],
+            input_path=aligned_center,
+            n4_bias_correction=True,
+            raw_skull_output_path=center_out,
+        )
+        moving = []
+        for m_info, m_out in zip(moving_info, moving_outs):
+            m_path = _clip_negatives(Path(m_info["path"]))
+            aligned_m = _com_align(m_path, Atlas.SRI24_SKULLSTRIPPED)
+            moving.append(Modality(
+                modality_name=m_info["modality"],
+                input_path=aligned_m,
+                n4_bias_correction=True,
+                raw_skull_output_path=m_out,
+            ))
+        preprocessor = AtlasCentricPreprocessor(
+            center_modality=center,
+            moving_modalities=moving,
+            registrator=ANTsRegistrator(
+                registration_params={"type_of_transform": "Affine"}
+            ),
+            brain_extractor=None,
+            n4_bias_corrector=SitkN4BiasCorrector(),
+            atlas_image_path=Atlas.SRI24_SKULLSTRIPPED,
+            use_gpu=(device != "cpu"),
+        )
+    else:
+        preprocessor = AtlasCentricPreprocessor(
+            center_modality=center,
+            moving_modalities=moving,
+            registrator=ANTsRegistrator(
+                registration_params={"type_of_transform": "Affine"}
+            ),
+            brain_extractor=HDBetExtractor(),
+            n4_bias_corrector=SitkN4BiasCorrector(),
+            atlas_image_path=Atlas.SRI24,
+            use_gpu=(device != "cpu"),
+        )
 
     preprocessor.run(log_file=log_dir / f"{subject_id}.log")
 
-    # Clean up temp clipped files
+    # Clean up temp files (clipped + CoM-aligned)
     for p in [Path(center_info["path"])] + [Path(m["path"]) for m in moving_info]:
-        cleaned = p.parent / f"_cleaned_{p.name}"
-        if cleaned.exists():
-            cleaned.unlink()
+        for prefix in ("_cleaned_", "_com_aligned_"):
+            tmp = p.parent / f"{prefix}{p.name}"
+            if tmp.exists():
+                tmp.unlink()
 
     elapsed = time.time() - t0
     log.info(f"Done {subject_id} ({elapsed:.1f}s)")

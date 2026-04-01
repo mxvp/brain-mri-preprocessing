@@ -48,17 +48,21 @@ def _oasis_analyze_to_nifti(hdr_path: Path, output_path: Path):
     arr_ras = np.transpose(arr, (2, 1, 0))[:, ::-1, ::-1].astype(np.float32).copy()
     spacing = (img.spacing[2], img.spacing[1], img.spacing[0])
 
-    # Center our volume on SRI24's center for reliable registration initialization
-    # SRI24 center: (119, -120, 77.5) with direction [[-1,0,0],[0,-1,0],[0,0,1]]
-    sri24_center = (
-        atlas.origin[0] + atlas.direction[0][0] * atlas.shape[0] / 2 * atlas.spacing[0],
-        atlas.origin[1] + atlas.direction[1][1] * atlas.shape[1] / 2 * atlas.spacing[1],
-        atlas.origin[2] + atlas.direction[2][2] * atlas.shape[2] / 2 * atlas.spacing[2],
+    # Align brain center-of-mass to atlas brain center-of-mass
+    # (volume center != brain center because of neck/air space)
+    atlas_arr = atlas.numpy()
+    atlas_thresh = np.percentile(atlas_arr[atlas_arr > 0], 10)
+    atlas_com = np.argwhere(atlas_arr > atlas_thresh).mean(axis=0)
+    atlas_com_phys = tuple(
+        atlas.origin[i] + atlas.direction[i][i] * atlas_com[i] * atlas.spacing[i]
+        for i in range(3)
     )
-    origin = (
-        sri24_center[0] - atlas.direction[0][0] * arr_ras.shape[0] / 2 * spacing[0],
-        sri24_center[1] - atlas.direction[1][1] * arr_ras.shape[1] / 2 * spacing[1],
-        sri24_center[2] - atlas.direction[2][2] * arr_ras.shape[2] / 2 * spacing[2],
+
+    brain_thresh = np.percentile(arr_ras[arr_ras > 0], 10)
+    brain_com = np.argwhere(arr_ras > brain_thresh).mean(axis=0)
+    origin = tuple(
+        atlas_com_phys[i] - atlas.direction[i][i] * brain_com[i] * spacing[i]
+        for i in range(3)
     )
 
     new_img = ants.from_numpy(
@@ -104,7 +108,8 @@ def _is_3d_volume(path: Path, min_slices: int = 50, max_spacing: float = 3.0) ->
 # {
 #   "subject_id": str,
 #   "center": {"modality": str, "path": str},
-#   "moving": [{"modality": str, "path": str}, ...]
+#   "moving": [{"modality": str, "path": str}, ...],
+#   "pre_registered": bool  (optional, default False — if True, skip atlas registration)
 # }
 
 
@@ -208,6 +213,7 @@ class OASIS1(Dataset):
                 "subject_id": subject_dir.name,
                 "center": {"modality": "t1", "path": str(out)},
                 "moving": [],
+                "pre_registered": True,
             })
         log.info(f"OASIS-1: {len(results)} subjects")
         return results
@@ -237,6 +243,7 @@ class OASIS2(Dataset):
                 "subject_id": subject_dir.name,
                 "center": {"modality": "t1", "path": str(out)},
                 "moving": [],
+                "pre_registered": True,
             })
         log.info(f"OASIS-2: {len(results)} subjects")
         return results
@@ -420,6 +427,7 @@ class Schizo(Dataset):
                 "subject_id": f"SCHIZO_{subject_dir.name}",
                 "center": {"modality": "t1", "path": str(t1)},
                 "moving": moving,
+                "pre_skull_stripped": True,
             })
         log.info(f"SCHIZO: {len(results)} subjects")
         return results
