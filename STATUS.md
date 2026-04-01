@@ -22,6 +22,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | Stanford | 80       | T1Gd, FLAIR   | 160     | NIfTI        | Has negatives (clip), some FLAIR 2D  |
 | PPMI     | ~1,500   | T1, T2, FLAIR | TBD     | DICOM        | dcm2niix first, many 2D to filter    |
 | OASIS-1  | 611      | T1            | 611     | Analyze      | Use T88 version, re-register to SRI24 |
+| OASIS-2  | 373      | T1            | 373     | Analyze      | Raw permute (AP,SI,LR)->(LR,AP,SI)   |
 
 
 ## Needs registration only (already skull-stripped)
@@ -36,11 +37,12 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
 - `ADNI/processed/`, `SCHIZO/processed/norm*`, `TCGA/processed/` — MNI152 atlas, z-score normalized. Wrong space.
 
-## Pipeline fixes remaining
+## Pipeline fixes — ALL RESOLVED
 
-1. **OASIS**: CoM origin alignment before ANTs registration (origin mismatch causes cut-off)
-2. **SCHIZO**: Use `Atlas.SRI24_SKULLSTRIPPED`, skip skull-stripping, CoM init
-3. **Multi-modal**: T1 as center, T2/FLAIR/T1Gd as moving (co-registered through T1)
+- OASIS-1: T88 → SRI24 re-registration (solved)
+- OASIS-2: Raw axis permutation + SRI24 registration (solved)
+- SCHIZO: SS atlas + CoM + skip HD-BET (solved)
+- Multi-modal: T1 as center, others as moving (solved)
 
 ## Totals
 
@@ -48,8 +50,8 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | Status         | Volumes                   |
 | -------------- | ------------------------- |
 | Ready          | ~5,356                    |
-| Needs pipeline | ~3,121+                   |
+| Needs pipeline | ~3,494+                   |
 | Needs reg only | 670                       |
-| **Total**      | **~9,147+** (before PPMI) |
+| **Total**      | **~9,520+** (before PPMI) |
 
 
