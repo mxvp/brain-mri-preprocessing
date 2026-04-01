@@ -595,7 +595,9 @@ REGISTRY: dict[str, type[Dataset]] = {
     "adni": ADNI,
     "schizo": Schizo,
     "stanford": Stanford,
-    "tcga": TCGA,
-    "ucsf": UCSF,
-    "upenn": UPenn,
+    # TCGA, UCSF, UPenn are already preprocessed in SRI24 — no pipeline needed.
+    # Classes kept below for reference / inventory if ever needed.
+    # "tcga": TCGA,
+    # "ucsf": UCSF,
+    # "upenn": UPenn,
 }
