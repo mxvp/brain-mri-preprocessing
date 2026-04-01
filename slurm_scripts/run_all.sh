@@ -4,7 +4,8 @@
 
 mkdir -p logs
 
-for ds in ixi adni stanford tcga schizo upenn ppmi; do
+# UPENN, TCGA, UCSF are already in SRI24 — no preprocessing needed
+for ds in ixi adni stanford schizo ppmi oasis1 oasis2; do
   MANIFEST="data/staging/$ds/manifest.json"
   if [ ! -f "$MANIFEST" ]; then
     echo "SKIP $ds: no manifest.json"
