@@ -62,6 +62,43 @@ def _oasis1_t88_to_sri24(t88_hdr_path: Path, output_path: Path):
     ants.image_write(result["warpedmovout"], str(output_path))
 
 
+def _oasis2_raw_to_sri24(hdr_path: Path, output_path: Path):
+    """Convert OASIS-2 raw Analyze to SRI24-registered NIfTI.
+
+    OASIS-2 raw data is (AP, SI, LR) at (1, 1, 1.25)mm but Analyze header has
+    identity direction. We permute to (LR, AP, SI) to match T88 layout, set
+    atlas direction/origin, CoM-align, and affine-register to SRI24.
+    """
+    import brainles_preprocessing.registration as _reg
+    sri24_paths = list(Path(_reg.__file__).parent.rglob("sri24.nii"))
+    if not sri24_paths:
+        raise RuntimeError("SRI24 atlas not found.")
+    atlas = ants.image_read(str(sri24_paths[0]))
+
+    raw = nib.load(str(hdr_path))
+    d = raw.get_fdata().squeeze().astype(np.float32)
+    zooms = raw.header.get_zooms()
+
+    # Permute from (AP, SI, LR) to (LR, AP, SI)
+    d_perm = np.transpose(d, (2, 0, 1))
+    spacing = (float(zooms[2]), float(zooms[0]), float(zooms[1]))
+
+    img = ants.from_numpy(d_perm, origin=atlas.origin, spacing=spacing, direction=atlas.direction)
+
+    def _phys_com(img):
+        arr = img.numpy()
+        thresh = np.percentile(arr[arr > 0], 10) if arr.max() > 0 else 0
+        com_vox = np.argwhere(arr > thresh).mean(axis=0)
+        d = np.array(img.direction).reshape(3, 3)
+        return np.array(img.origin) + d @ (com_vox * np.array(img.spacing))
+
+    shift = _phys_com(atlas) - _phys_com(img)
+    img.set_origin([img.origin[i] + shift[i] for i in range(3)])
+
+    result = ants.registration(fixed=atlas, moving=img, type_of_transform="Affine")
+    ants.image_write(result["warpedmovout"], str(output_path))
+
+
 def _dcm2niix(dicom_dir: Path, output_dir: Path, filename: str) -> Path:
     result = subprocess.run(
         ["dcm2niix", "-z", "y", "-f", filename, "-o", str(output_dir), str(dicom_dir)],
@@ -208,7 +245,7 @@ class OASIS1(Dataset):
 
 
 class OASIS2(Dataset):
-    """OASIS-2 — Analyze format, same sagittal MPRAGE fix as OASIS-1."""
+    """OASIS-2 — Raw Analyze format, permute axes + register to SRI24."""
 
     name = "oasis2"
 
@@ -216,6 +253,8 @@ class OASIS2(Dataset):
         output_dir.mkdir(parents=True, exist_ok=True)
         results = []
         for subject_dir in sorted(input_dir.rglob("OAS2_*_MR*")):
+            if not subject_dir.is_dir():
+                continue
             raw_dir = subject_dir / "RAW"
             if not raw_dir.exists():
                 continue
@@ -225,7 +264,7 @@ class OASIS2(Dataset):
                 continue
             out = output_dir / f"{subject_dir.name}.nii.gz"
             if not out.exists():
-                _oasis_analyze_to_nifti(hdrs[0], out)
+                _oasis2_raw_to_sri24(hdrs[0], out)
                 log.info(f"Converted {subject_dir.name}")
             results.append({
                 "subject_id": subject_dir.name,
