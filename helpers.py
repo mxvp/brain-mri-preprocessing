@@ -15,26 +15,47 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 
-def split_manifest(manifest_path: Path, n_parts: int):
-    """Split a manifest.json into N parts for parallel SLURM jobs."""
+def _is_subject_done(subject: dict, output_dir: Path) -> bool:
+    """Check if all outputs for a subject already exist."""
+    sid = subject["subject_id"]
+    center_mod = subject["center"]["modality"]
+    if not (output_dir / f"{sid}_{center_mod}_preprocessed.nii.gz").exists():
+        return False
+    for m in subject.get("moving", []):
+        if not (output_dir / f"{sid}_{m['modality']}_preprocessed.nii.gz").exists():
+            return False
+    return True
+
+
+def split_manifest(manifest_path: Path, n_parts: int, output_dir: Path = None):
+    """Split a manifest.json into N parts for parallel SLURM jobs.
+    If output_dir is given, only includes subjects that aren't done yet."""
     with open(manifest_path) as f:
         subjects = json.load(f)
 
+    if output_dir and output_dir.exists():
+        remaining = [s for s in subjects if not _is_subject_done(s, output_dir)]
+        print(f"  {len(subjects)} total, {len(subjects) - len(remaining)} done, {len(remaining)} remaining")
+        subjects = remaining
+
+    if not subjects:
+        print("  Nothing to process!")
+        return
+
     chunk = math.ceil(len(subjects) / n_parts)
     parent = manifest_path.parent
-    stem = manifest_path.stem
 
     for i in range(n_parts):
         part = subjects[i * chunk : (i + 1) * chunk]
         if not part:
             continue
-        out = parent / f"{stem}_part{i + 1}.json"
+        out = parent / f"manifest_part{i + 1}.json"
         with open(out, "w") as f:
             json.dump(part, f, indent=2)
         vols = sum(1 + len(s.get("moving", [])) for s in part)
         print(f"  {out.name}: {len(part)} subjects, {vols} volumes")
 
-    print(f"\nSplit {len(subjects)} subjects into {n_parts} parts")
+    print(f"\nSplit {len(subjects)} remaining subjects into {n_parts} parts")
 
 
 def merge_manifests(manifest_dir: Path, output_path: Path):
@@ -86,9 +107,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Preprocessing helpers")
     sub = parser.add_subparsers(dest="command")
 
-    sp = sub.add_parser("split", help="Split manifest into N parts")
+    sp = sub.add_parser("split", help="Split manifest into N parts (only unfinished subjects)")
     sp.add_argument("manifest", type=Path)
     sp.add_argument("n_parts", type=int)
+    sp.add_argument("--output-dir", type=Path, help="Preprocessed output dir to check for done subjects")
 
     mg = sub.add_parser("merge", help="Merge manifest parts back together")
     mg.add_argument("manifest_dir", type=Path)
@@ -101,7 +123,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.command == "split":
-        split_manifest(args.manifest, args.n_parts)
+        split_manifest(args.manifest, args.n_parts, output_dir=args.output_dir)
     elif args.command == "merge":
         merge_manifests(args.manifest_dir, args.output)
     elif args.command == "count":
