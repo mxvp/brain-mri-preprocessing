@@ -26,54 +26,39 @@ log = logging.getLogger(__name__)
 
 # --- Conversion helpers ---
 
-def _oasis_analyze_to_nifti(hdr_path: Path, output_path: Path):
-    """Convert OASIS Analyze (.hdr/.img) to NIfTI with correct orientation.
+def _oasis1_t88_to_sri24(t88_hdr_path: Path, output_path: Path):
+    """Convert OASIS-1 T88 (Talairach) Analyze file to SRI24-registered NIfTI.
 
-    OASIS-1/2 sagittal MPRAGE data is stored as (SI, AP, LR) but the Analyze
-    header misreports the orientation. We permute axes, set correct metadata,
-    and pre-register to SRI24 using direct ANTs (brainles registration doesn't
-    converge well from the Analyze starting position).
+    OASIS-1 T88 files are already correctly oriented in Talairach space (LR, AP, SI)
+    but stored as Analyze with identity direction. We set the atlas direction/origin,
+    CoM-align, and affine-register to SRI24.
     """
-    # Load SRI24 atlas from brainles installation
     import brainles_preprocessing.registration as _reg
     sri24_paths = list(Path(_reg.__file__).parent.rglob("sri24.nii"))
     if not sri24_paths:
         raise RuntimeError("SRI24 atlas not found. Run brainles once to download it.")
     atlas = ants.image_read(str(sri24_paths[0]))
 
-    img = ants.image_read(str(hdr_path))
-    arr = img.numpy()  # (256, 256, 128) = (SI, AP, LR)
-
-    # Permute to (LR, AP, SI) and flip Y/Z to match SRI24 axis directions
-    arr_ras = np.transpose(arr, (2, 1, 0))[:, ::-1, ::-1].astype(np.float32).copy()
-    spacing = (img.spacing[2], img.spacing[1], img.spacing[0])
-
-    # Align brain center-of-mass to atlas brain center-of-mass
-    # (volume center != brain center because of neck/air space)
-    atlas_arr = atlas.numpy()
-    atlas_thresh = np.percentile(atlas_arr[atlas_arr > 0], 10)
-    atlas_com = np.argwhere(atlas_arr > atlas_thresh).mean(axis=0)
-    atlas_com_phys = tuple(
-        atlas.origin[i] + atlas.direction[i][i] * atlas_com[i] * atlas.spacing[i]
-        for i in range(3)
-    )
-
-    brain_thresh = np.percentile(arr_ras[arr_ras > 0], 10)
-    brain_com = np.argwhere(arr_ras > brain_thresh).mean(axis=0)
-    origin = tuple(
-        atlas_com_phys[i] - atlas.direction[i][i] * brain_com[i] * spacing[i]
-        for i in range(3)
-    )
-
-    new_img = ants.from_numpy(
-        arr_ras,
-        origin=origin,
-        spacing=spacing,
+    t88 = ants.image_read(str(t88_hdr_path))
+    t88_fixed = ants.from_numpy(
+        t88.numpy(),
+        origin=atlas.origin,
+        spacing=(1.0, 1.0, 1.0),
         direction=atlas.direction,
     )
 
-    # Pre-register to SRI24 — direct ANTs handles this reliably
-    result = ants.registration(fixed=atlas, moving=new_img, type_of_transform="Affine")
+    # CoM alignment for registration convergence
+    def _phys_com(img):
+        arr = img.numpy()
+        thresh = np.percentile(arr[arr > 0], 10) if arr.max() > 0 else 0
+        com_vox = np.argwhere(arr > thresh).mean(axis=0)
+        d = np.array(img.direction).reshape(3, 3)
+        return np.array(img.origin) + d @ (com_vox * np.array(img.spacing))
+
+    shift = _phys_com(atlas) - _phys_com(t88_fixed)
+    t88_fixed.set_origin([t88_fixed.origin[i] + shift[i] for i in range(3)])
+
+    result = ants.registration(fixed=atlas, moving=t88_fixed, type_of_transform="Affine")
     ants.image_write(result["warpedmovout"], str(output_path))
 
 
@@ -187,7 +172,7 @@ class IXI(Dataset):
 
 
 class OASIS1(Dataset):
-    """OASIS-1 — Analyze format (.hdr/.img), sagittal MPRAGE, axis permutation required."""
+    """OASIS-1 — Uses T88 (Talairach-registered) version, re-registered to SRI24."""
 
     name = "oasis1"
 
@@ -195,19 +180,22 @@ class OASIS1(Dataset):
         output_dir.mkdir(parents=True, exist_ok=True)
         results = []
         for subject_dir in sorted(input_dir.rglob("OAS1_*_MR*")):
-            raw_dir = subject_dir / "RAW"
-            if not raw_dir.exists():
+            if not subject_dir.is_dir():
                 continue
-            hdr = raw_dir / f"{subject_dir.name}_mpr-1_anon.hdr"
-            if not hdr.exists():
-                hdrs = sorted(raw_dir.glob("*mpr-1*.hdr"))
+            # Use T88 version (already properly oriented by OASIS pipeline)
+            t88_dir = subject_dir / "PROCESSED" / "MPRAGE" / "T88_111"
+            if not t88_dir.exists():
+                continue
+            t88_gfc = t88_dir / f"{subject_dir.name}_mpr_n4_anon_111_t88_gfc.hdr"
+            if not t88_gfc.exists():
+                hdrs = sorted(t88_dir.glob("*_t88_gfc.hdr"))
                 if not hdrs:
-                    log.warning(f"No mpr-1 for {subject_dir.name}")
+                    log.warning(f"No T88 gfc for {subject_dir.name}")
                     continue
-                hdr = hdrs[0]
+                t88_gfc = hdrs[0]
             out = output_dir / f"{subject_dir.name}.nii.gz"
             if not out.exists():
-                _oasis_analyze_to_nifti(hdr, out)
+                _oasis1_t88_to_sri24(t88_gfc, out)
                 log.info(f"Converted {subject_dir.name}")
             results.append({
                 "subject_id": subject_dir.name,
