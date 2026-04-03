@@ -2,56 +2,57 @@
 
 Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
-## Ready (no preprocessing needed)
+## Preprocessing done
 
+| Dataset  | Volumes | Modalities          | Notes                           |
+| -------- | ------- | ------------------- | ------------------------------- |
+| UPENN    | 2,684   | T1, T1GD, T2, FLAIR | Already in SRI24                |
+| TCGA     | 668     | T1, T1Gd, T2, FLAIR | Already in SRI24                |
+| UCSF     | 2,004   | T1, T1c, T2, FLAIR  | Already in SRI24, bias-corrected|
+| ADNI     | 815     | T1                   | Full pipeline                   |
+| Stanford | 158     | T1Gd, FLAIR          | Full pipeline                   |
+| SCHIZO   | 670     | T1, T2               | Reg only (pre-stripped)         |
+| OASIS-1  | 436     | T1                   | T88 → SRI24                    |
+| OASIS-2  | 373     | T1                   | Raw permute → SRI24            |
+| IXI      | ~795    | T1, T2               | Full pipeline, done             |
+| PPMI     | ~3,908  | T1, T2, FLAIR        | Full pipeline, done             |
 
-| Dataset | Subjects | Modalities          | Volumes | Notes                           |
-| ------- | -------- | ------------------- | ------- | ------------------------------- |
-| UPENN   | 671      | T1, T1GD, T2, FLAIR | 2,684   | SRI24, stripped, LPS            |
-| TCGA    | 167      | T1, T1Gd, T2, FLAIR | 668     | SRI24, stripped, LPS            |
-| UCSF    | 501      | T1, T1c, T2, FLAIR  | 2,004   | SRI24, stripped, bias-corrected |
+**Subtotal preprocessed: ~12,511 volumes**
 
+## Downloading / incoming
 
-## Needs full pipeline (N4 + skull-strip + SRI24 registration)
+| Dataset   | Est. volumes | Modalities | Status                              |
+| --------- | ------------ | ---------- | ----------------------------------- |
+| ADNI full | ~10,913      | T1         | Downloading on Mac (250GB), NIfTI+DICOM via LONI |
+| ABIDE I   | ~1,100       | T1         | Downloading on Sherlock (S3, no auth) |
+| ABIDE II  | ~1,100       | T1         | Downloading on Sherlock (S3, no auth) |
 
+## Pending access
 
-| Dataset  | Subjects | Modalities    | Volumes | Format       | Issues                               |
-| -------- | -------- | ------------- | ------- | ------------ | ------------------------------------ |
-| IXI      | 581      | T1, T2        | ~1,159  | NIfTI        | Anisotropic, some T2 are 2D (filter) |
-| ADNI     | 818      | T1            | 818     | NIfTI (.nii) | Rotated affine (IPL), anisotropic    |
-| Stanford | 80       | T1Gd, FLAIR   | 160     | NIfTI        | Has negatives (clip), some FLAIR 2D  |
-| PPMI     | ~1,500   | T1, T2, FLAIR | TBD     | DICOM        | dcm2niix first, many 2D to filter    |
-| OASIS-1  | 611      | T1            | 611     | Analyze      | Use T88 version, re-register to SRI24 |
-| OASIS-2  | 373      | T1            | 373     | Analyze      | Raw permute (AP,SI,LR)->(LR,AP,SI)   |
-
-
-## Needs registration only (already skull-stripped)
-
-
-| Dataset | Subjects | Modalities | Volumes | Issue                                |
-| ------- | -------- | ---------- | ------- | ------------------------------------ |
-| SCHIZO  | 335      | T1, T2     | 670     | Skip HD-BET, use SS atlas + CoM init |
-
+| Dataset   | Est. volumes | Status                              |
+| --------- | ------------ | ----------------------------------- |
+| OASIS-3   | ~2,842       | DUA approved, NITRC access pending (emailed) |
+| OASIS-4   | ~600+        | Access requested                    |
+| HCP       | ~1,800       | Not yet applied                     |
+| BraTS 2023| ~5,000       | Available on Synapse, not started   |
+| ADNI (full)| ~10K more   | Access granted, downloading         |
 
 ## Not usable
 
-- `ADNI/processed/`, `SCHIZO/processed/norm*`, `TCGA/processed/` — MNI152 atlas, z-score normalized. Wrong space.
+- `ADNI/processed/`, `SCHIZO/processed/norm*`, `TCGA/processed/` — MNI152 atlas, wrong space.
 
 ## Pipeline fixes — ALL RESOLVED
 
-- OASIS-1: T88 → SRI24 re-registration (solved)
-- OASIS-2: Raw axis permutation + SRI24 registration (solved)
-- SCHIZO: SS atlas + CoM + skip HD-BET (solved)
-- Multi-modal: T1 as center, others as moving (solved)
+- OASIS-1: T88 → SRI24 re-registration
+- OASIS-2: Raw axis permutation + SRI24 registration
+- SCHIZO: SS atlas + CoM + skip HD-BET
+- Multi-modal: T1 as center, others as moving
 
 ## Totals
 
-
-| Status         | Volumes                   |
-| -------------- | ------------------------- |
-| Ready          | ~5,356                    |
-| Needs pipeline | ~3,494+                   |
-| Needs reg only | 670                       |
-| **Total**      | **~9,520+** (before PPMI) |
-
-
+| Status          | Volumes     |
+| --------------- | ----------- |
+| Preprocessed    | ~12,511     |
+| Downloading     | ~13,113     |
+| Pending access  | ~10,242+    |
+| **Projected**   | **~35,866+**|
