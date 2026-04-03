@@ -21,21 +21,21 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
 ## Downloading / incoming
 
-| Dataset   | Est. volumes | Modalities | Status                              |
-| --------- | ------------ | ---------- | ----------------------------------- |
-| ADNI full | ~10,913      | T1         | Downloading on Mac (250GB), NIfTI+DICOM via LONI |
-| ABIDE I   | ~1,100       | T1         | Downloading on Sherlock (S3, no auth) |
-| ABIDE II  | ~1,100       | T1         | Downloading on Sherlock (S3, no auth) |
+| Dataset    | Est. volumes | Modalities | Status                                    |
+| ---------- | ------------ | ---------- | ----------------------------------------- |
+| ADNI full  | ~10,913      | T1         | Downloading on Mac (250GB), LONI          |
+| ABIDE I    | ~2,228       | T1         | Downloaded on Sherlock (S3)               |
+| ABIDE II   | ~1,100       | T1         | Downloaded on Sherlock (S3)               |
+| BraTS 2023 | ~5,000       | T1,T1c,T2,FLAIR | Downloading on Sherlock (Synapse)    |
+| HCP-YA     | ~2,226       | T1, T2     | Downloading on Sherlock (S3)              |
+| HCP-Aging  | ~2,789       | T1, T2     | Access granted, S3 bucket TBD            |
 
 ## Pending access
 
 | Dataset   | Est. volumes | Status                              |
 | --------- | ------------ | ----------------------------------- |
-| OASIS-3   | ~2,842       | DUA approved, NITRC access pending (emailed) |
+| OASIS-3   | ~2,842       | DUA approved, NITRC access pending  |
 | OASIS-4   | ~600+        | Access requested                    |
-| HCP       | ~1,800       | Not yet applied                     |
-| BraTS 2023| ~5,000       | Available on Synapse, not started   |
-| ADNI (full)| ~10K more   | Access granted, downloading         |
 
 ## Not usable
 
@@ -48,11 +48,52 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 - SCHIZO: SS atlas + CoM + skip HD-BET
 - Multi-modal: T1 as center, others as moving
 
+## Download commands reference
+
+### ABIDE (S3, no auth)
+```bash
+module load aws-cli
+aws s3 sync s3://fcp-indi/data/Projects/ABIDE/RawDataBIDS/ data/ABIDE/ --no-sign-request --exclude "*" --include "*T1w*"
+aws s3 sync s3://fcp-indi/data/Projects/ABIDE2/RawData/ data/ABIDE2/ --no-sign-request --exclude "*" --include "*T1w*"
+```
+
+### HCP Young Adult (S3, needs credentials)
+```bash
+module load aws-cli
+export AWS_ACCESS_KEY_ID="<from connectomedb>"
+export AWS_SECRET_ACCESS_KEY="<from connectomedb>"
+
+# Skull-stripped + bias-corrected (~38GB for 1113 subjects)
+aws s3 sync s3://hcp-openaccess/HCP_1200/ data/HCP_YA/ --region us-east-1 \
+  --exclude "*" \
+  --include "*/T1w/T1w_acpc_dc_restore_brain.nii.gz" \
+  --include "*/T1w/T2w_acpc_dc_restore_brain.nii.gz"
+
+# With skull (backup, ~190GB) — add if needed:
+#  --include "*/T1w/T1w_acpc_dc_restore.nii.gz"
+#  --include "*/T1w/T2w_acpc_dc_restore.nii.gz"
+```
+HCP files: `T1w/` folder per subject. `_restore_brain` = bias-corrected + skull-stripped (FreeSurfer).
+`_restore` = bias-corrected, with skull. Both in native ACPC space, need SRI24 registration.
+Pre-stripped → use same approach as SCHIZO (SS atlas + CoM, skip HD-BET).
+
+### BraTS 2023 (Synapse, needs token)
+```bash
+pip install synapseclient
+synapse login -p "<your_synapse_personal_access_token>"
+synapse get -r syn51156910 --downloadLocation data/BraTS2023/
+```
+BraTS data is already preprocessed (SRI24, skull-stripped, multi-modal). Likely overlaps with TCGA/UPENN.
+
+### ADNI full (LONI, IP-bound)
+Download via LONI IDA web interface to local Mac, then rsync to Sherlock.
+Collection: ADSP-PHC ADNI T1 1.0 (10,913 scans, 2,592 subjects, 8,602 NIfTI + 2,311 DICOM).
+
 ## Totals
 
-| Status          | Volumes     |
-| --------------- | ----------- |
-| Preprocessed    | ~12,511     |
-| Downloading     | ~13,113     |
-| Pending access  | ~10,242+    |
-| **Projected**   | **~35,866+**|
+| Status          | Volumes      |
+| --------------- | ------------ |
+| Preprocessed    | ~12,511      |
+| Downloading     | ~24,256      |
+| Pending access  | ~3,442+      |
+| **Projected**   | **~40,209+** |
