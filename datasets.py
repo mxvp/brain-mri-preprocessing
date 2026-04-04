@@ -586,25 +586,25 @@ class UPenn(Dataset):
         return results
 
 
-class ABIDE(Dataset):
-    """ABIDE I+II — BIDS format T1w from S3. Point at data/ABIDE or data/ABIDE2."""
+class BIDSDefaced(Dataset):
+    """Generic BIDS T1w dataset with defacing. Uses SS atlas + CoM for robust registration.
+    Works for: ABIDE I/II, NKI-RS, CORR, FCON1000, HBN, ADHD200, and similar."""
 
-    name = "abide"
+    name = "bids_defaced"
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
         files = sorted(input_dir.rglob("*T1w.nii.gz"))
         results = []
         for f in files:
-            # Subject ID from path: .../site/sub-XXXXX/[ses-N/]anat/sub-XXXXX_T1w.nii.gz
             subject_id = f.name.replace("_T1w.nii.gz", "").replace("_run-1", "")
             results.append({
-                "subject_id": f"ABIDE_{subject_id}",
+                "subject_id": subject_id,
                 "center": {"modality": "t1", "path": str(f)},
                 "moving": [],
                 "com_align": True,
                 "use_ss_atlas": True,
             })
-        log.info(f"ABIDE: {len(results)} T1w volumes")
+        log.info(f"BIDS defaced: {len(results)} T1w volumes from {input_dir.name}")
         return results
 
 
@@ -647,7 +647,7 @@ REGISTRY: dict[str, type[Dataset]] = {
     "adni": ADNI,
     "schizo": Schizo,
     "stanford": Stanford,
-    "abide": ABIDE,
+    "bids_defaced": BIDSDefaced,  # ABIDE I/II, NKI, CORR, FCON1000, HBN, ADHD200
     "hcp": HCP,
     # TCGA, UCSF, UPenn are already preprocessed in SRI24 — no pipeline needed.
     # Classes kept below for reference / inventory if ever needed.
