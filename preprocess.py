@@ -100,6 +100,12 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
     # Clip negatives
     center_path = _clip_negatives(Path(center_info["path"]))
 
+    # CoM alignment if requested (helps with defaced/cropped inputs)
+    com_align = subject.get("com_align", False) or pre_skull_stripped
+    if com_align and not pre_skull_stripped:
+        atlas_enum = Atlas.SRI24
+        center_path = _com_align(center_path, atlas_enum)
+
     center = CenterModality(
         modality_name=center_info["modality"],
         input_path=center_path,
@@ -110,6 +116,8 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
     moving = []
     for m_info, m_out in zip(moving_info, moving_outs):
         m_path = _clip_negatives(Path(m_info["path"]))
+        if com_align and not pre_skull_stripped:
+            m_path = _com_align(m_path, atlas_enum)
         moving.append(Modality(
             modality_name=m_info["modality"],
             input_path=m_path,

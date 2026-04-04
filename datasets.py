@@ -601,6 +601,7 @@ class ABIDE(Dataset):
                 "subject_id": f"ABIDE_{subject_id}",
                 "center": {"modality": "t1", "path": str(f)},
                 "moving": [],
+                "com_align": True,
             })
         log.info(f"ABIDE: {len(results)} T1w volumes")
         return results
