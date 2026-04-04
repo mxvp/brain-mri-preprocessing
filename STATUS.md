@@ -38,7 +38,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | OASIS-4   | ~600+        | Access requested                    |
 | ABCD      | ~12,000      | Applying via NDA (pediatric, ages 9-10) |
 | HCP Aging | ~5,578       | Access granted, need external SSD for 2TB Aspera download |
-| NKI-RS    | ~1,000       | On S3 (fcp-indi), no auth, not yet checked |
+| NKI-RS    | ~1,000+      | Downloading on Sherlock (S3, no auth, BIDS T1w, multi-session) |
 
 ## Not usable
 
