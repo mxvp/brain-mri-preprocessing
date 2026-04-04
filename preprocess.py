@@ -97,11 +97,14 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
     log.info(f"Processing {subject_id} ({1 + len(moving_info)} modalities)")
     t0 = time.time()
 
+    pre_registered = subject.get("pre_registered", False)
+    pre_skull_stripped = subject.get("pre_skull_stripped", False)
+    com_align = subject.get("com_align", False) or pre_skull_stripped
+
     # Clip negatives
     center_path = _clip_negatives(Path(center_info["path"]))
 
     # CoM alignment if requested (helps with defaced/cropped inputs)
-    com_align = subject.get("com_align", False) or pre_skull_stripped
     if com_align and not pre_skull_stripped:
         atlas_enum = Atlas.SRI24
         center_path = _com_align(center_path, atlas_enum)
@@ -124,9 +127,6 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
             n4_bias_correction=True,
             raw_bet_output_path=m_out,
         ))
-
-    pre_registered = subject.get("pre_registered", False)
-    pre_skull_stripped = subject.get("pre_skull_stripped", False)
 
     if pre_registered:
         # Already in SRI24 space (e.g. OASIS) — skip atlas registration
