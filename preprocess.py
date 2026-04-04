@@ -169,6 +169,19 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
             atlas_image_path=Atlas.SRI24_SKULLSTRIPPED,
             use_gpu=(device != "cpu"),
         )
+    elif subject.get("use_ss_atlas", False):
+        # Defaced input — register to SS atlas for better convergence, then skull-strip (e.g. ABIDE)
+        preprocessor = AtlasCentricPreprocessor(
+            center_modality=center,
+            moving_modalities=moving,
+            registrator=ANTsRegistrator(
+                registration_params={"type_of_transform": "Affine"}
+            ),
+            brain_extractor=HDBetExtractor(),
+            n4_bias_corrector=SitkN4BiasCorrector(),
+            atlas_image_path=Atlas.SRI24_SKULLSTRIPPED,
+            use_gpu=(device != "cpu"),
+        )
     else:
         preprocessor = AtlasCentricPreprocessor(
             center_modality=center,

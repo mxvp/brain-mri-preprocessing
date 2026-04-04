@@ -602,6 +602,7 @@ class ABIDE(Dataset):
                 "center": {"modality": "t1", "path": str(f)},
                 "moving": [],
                 "com_align": True,
+                "use_ss_atlas": True,
             })
         log.info(f"ABIDE: {len(results)} T1w volumes")
         return results
