@@ -36,6 +36,9 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | --------- | ------------ | ----------------------------------- |
 | OASIS-3   | ~2,842       | DUA approved, NITRC access pending  |
 | OASIS-4   | ~600+        | Access requested                    |
+| ABCD      | ~12,000      | Applying via NDA (pediatric, ages 9-10) |
+| HCP Aging | ~5,578       | Access granted, need external SSD for 2TB Aspera download |
+| NKI-RS    | ~1,000       | On S3 (fcp-indi), no auth, not yet checked |
 
 ## Not usable
 
@@ -116,11 +119,20 @@ Aspera only, no S3 access. Token is IP-bound — cannot transfer from Sherlock.
 # Contains T1w + T2w + FreeSurfer outputs. We only need T1w/T2w_restore_brain files.
 ```
 
+## Pipeline fixes — summary
+
+- OASIS-1: T88 → SRI24 re-registration
+- OASIS-2: Raw axis permutation + SRI24 registration
+- SCHIZO: SS atlas + CoM + skip HD-BET (`pre_skull_stripped`)
+- ABIDE: SS atlas + CoM for defaced inputs (`use_ss_atlas` + `com_align`)
+- HCP: SS atlas + CoM, pre-stripped (`pre_skull_stripped`)
+- Multi-modal: T1 as center, others as moving
+
 ## Totals
 
 | Status          | Volumes      |
 | --------------- | ------------ |
 | Preprocessed    | ~12,511      |
-| Downloading     | ~24,256      |
-| Pending access  | ~9,020+      |
-| **Projected**   | **~45,787+** |
+| In progress     | ~15,668      |
+| Pending access  | ~22,020+     |
+| **Projected**   | **~50,199+** |
