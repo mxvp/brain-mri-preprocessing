@@ -606,6 +606,36 @@ class ABIDE(Dataset):
         return results
 
 
+class HCP(Dataset):
+    """HCP Young Adult — pre-skull-stripped T1w+T2w at 0.7mm iso, ACPC-aligned."""
+
+    name = "hcp"
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
+        results = []
+        for subject_dir in sorted(input_dir.iterdir()):
+            if not subject_dir.is_dir():
+                continue
+            t1w_dir = subject_dir / "T1w"
+            if not t1w_dir.exists():
+                continue
+            t1 = t1w_dir / "T1w_acpc_dc_restore_brain.nii.gz"
+            t2 = t1w_dir / "T2w_acpc_dc_restore_brain.nii.gz"
+            if not t1.exists():
+                continue
+            moving = []
+            if t2.exists():
+                moving.append({"modality": "t2", "path": str(t2)})
+            results.append({
+                "subject_id": f"HCP_{subject_dir.name}",
+                "center": {"modality": "t1", "path": str(t1)},
+                "moving": moving,
+                "pre_skull_stripped": True,
+            })
+        log.info(f"HCP: {len(results)} subjects")
+        return results
+
+
 REGISTRY: dict[str, type[Dataset]] = {
     "ixi": IXI,
     "oasis1": OASIS1,
@@ -616,6 +646,7 @@ REGISTRY: dict[str, type[Dataset]] = {
     "schizo": Schizo,
     "stanford": Stanford,
     "abide": ABIDE,
+    "hcp": HCP,
     # TCGA, UCSF, UPenn are already preprocessed in SRI24 — no pipeline needed.
     # Classes kept below for reference / inventory if ever needed.
     # "tcga": TCGA,
