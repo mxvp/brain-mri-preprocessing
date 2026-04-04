@@ -88,6 +88,33 @@ BraTS data is already preprocessed (SRI24, skull-stripped, multi-modal). Likely 
 ### ADNI full (LONI, IP-bound)
 Download via LONI IDA web interface to local Mac, then rsync to Sherlock.
 Collection: ADSP-PHC ADNI T1 1.0 (10,913 scans, 2,592 subjects, 8,602 NIfTI + 2,311 DICOM).
+```bash
+caffeinate -i curl -L -C - -o ADNI_T1.zip "https://ida.loni.usc.edu/download/files/ida1/<session-id>/ADSP-PHC%3A%20ADNI%20T1%201.0.zip"
+# Then rsync to Sherlock
+rsync -ahP ADNI_T1.zip maxvpuyv@login.sherlock.stanford.edu:/oak/.../data/ADNI_full/
+```
+
+### HCP Aging / AABC (Aspera, IP-bound token)
+ConnectomeDB → AABC Release 2 → Structural Preprocessed (2,788 subjects, ~2TB).
+Aspera only, no S3 access. Token is IP-bound — cannot transfer from Sherlock.
+```bash
+# Server details (from Aspera Connect logs):
+#   host: asp-connect1.wustl.edu
+#   user: asperaxfer
+#   port: 33001
+#   source: packages/prerelease/aabc/AABC_FZ1/
+#   auth: ASPERA_SCP_TOKEN (session-based, IP-bound)
+#   key: aspera_tokenauth_id_rsa
+#
+# To download on Sherlock, would need:
+#   1. Aspera token generated from same IP as Sherlock (not possible via browser)
+#   2. Or S3 access (not yet available for AABC)
+#   3. Or download 2TB to Mac via Aspera Connect, then rsync (impractical)
+#
+# TODO: Email hcp-users@humanconnectome.org asking for S3 access to AABC structural data
+# Each subject is a zip: HCA{id}_V{visit}_MR_StructuralRecommended.zip
+# Contains T1w + T2w + FreeSurfer outputs. We only need T1w/T2w_restore_brain files.
+```
 
 ## Totals
 
@@ -95,5 +122,5 @@ Collection: ADSP-PHC ADNI T1 1.0 (10,913 scans, 2,592 subjects, 8,602 NIfTI + 2,
 | --------------- | ------------ |
 | Preprocessed    | ~12,511      |
 | Downloading     | ~24,256      |
-| Pending access  | ~3,442+      |
-| **Projected**   | **~40,209+** |
+| Pending access  | ~9,020+      |
+| **Projected**   | **~45,787+** |
