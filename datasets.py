@@ -411,9 +411,12 @@ class PPMI(Dataset):
 
 
 class ADNI(Dataset):
-    """ADNI — NIfTI + DICOM T1 scans. Converts DICOMs during prepare."""
+    """ADNI — NIfTI + DICOM T1 scans. Picks best processing variant per subject+date."""
 
     name = "adni"
+    # Prefer most-processed NIfTI variants (higher = better)
+    PROC_PRIORITY = ["MT1__GradWarp__N3m", "MT1__N3m", "MPR__GradWarp__B1_Correction__N3",
+                     "MPR-R__GradWarp__B1_Correction__N3", "MPR__GradWarp__N3", "MPR__N3"]
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -424,9 +427,14 @@ class ADNI(Dataset):
                 continue
             subject_id = subject_dir.name
 
+            # Collect all scans by date across all processing variants
+            scans_by_date = {}  # date -> (priority, path_or_dcm_dir)
+
             for proc_dir in sorted(subject_dir.iterdir()):
                 if not proc_dir.is_dir():
                     continue
+                proc_name = proc_dir.name
+                priority = next((i for i, p in enumerate(self.PROC_PRIORITY) if p == proc_name), len(self.PROC_PRIORITY))
 
                 for date_dir in sorted(proc_dir.iterdir()):
                     if not date_dir.is_dir():
@@ -437,34 +445,43 @@ class ADNI(Dataset):
                         if not scan_dir.is_dir():
                             continue
 
-                        # Check for existing NIfTI
                         niis = sorted(scan_dir.glob("*.nii")) + sorted(scan_dir.glob("*.nii.gz"))
+                        dcms = sorted(scan_dir.glob("*.dcm"))
+
                         if niis:
-                            results.append({
-                                "subject_id": f"ADNI_{subject_id}_{date_short}",
-                                "center": {"modality": "t1", "path": str(niis[0])},
-                                "moving": [],
-                            })
+                            entry = (priority, "nii", niis[0])
+                        elif dcms:
+                            entry = (priority + 100, "dcm", scan_dir)  # DICOMs lower priority than any NIfTI
+                        else:
                             continue
 
-                        # Check for DICOMs — convert
-                        dcms = sorted(scan_dir.glob("*.dcm"))
-                        if dcms:
-                            filename = f"ADNI_{subject_id}_{date_short}"
-                            out = output_dir / f"{filename}.nii.gz"
-                            if not out.exists():
-                                try:
-                                    _dcm2niix(scan_dir, output_dir, filename)
-                                    log.info(f"Converted DICOM: {subject_id} {date_short}")
-                                except Exception:
-                                    log.exception(f"ADNI dcm2niix failed: {subject_id} {date_short}")
-                                    continue
-                            if out.exists():
-                                results.append({
-                                    "subject_id": f"ADNI_{subject_id}_{date_short}",
-                                    "center": {"modality": "t1", "path": str(out)},
-                                    "moving": [],
-                                })
+                        if date_short not in scans_by_date or entry[0] < scans_by_date[date_short][0]:
+                            scans_by_date[date_short] = entry
+
+            # Process best scan per date
+            for date_short, (priority, fmt, path) in sorted(scans_by_date.items()):
+                if fmt == "nii":
+                    results.append({
+                        "subject_id": f"ADNI_{subject_id}_{date_short}",
+                        "center": {"modality": "t1", "path": str(path)},
+                        "moving": [],
+                    })
+                else:
+                    filename = f"ADNI_{subject_id}_{date_short}"
+                    out = output_dir / f"{filename}.nii.gz"
+                    if not out.exists():
+                        try:
+                            _dcm2niix(path, output_dir, filename)
+                            log.info(f"Converted DICOM: {subject_id} {date_short}")
+                        except Exception:
+                            log.exception(f"ADNI dcm2niix failed: {subject_id} {date_short}")
+                            continue
+                    if out.exists():
+                        results.append({
+                            "subject_id": f"ADNI_{subject_id}_{date_short}",
+                            "center": {"modality": "t1", "path": str(out)},
+                            "moving": [],
+                        })
 
         log.info(f"ADNI: {len(results)} T1 volumes")
         return results
