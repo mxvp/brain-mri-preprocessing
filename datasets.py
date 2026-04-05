@@ -416,20 +416,24 @@ class ADNI(Dataset):
     name = "adni"
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
+        # Support both old format (subject/T1.nii) and new LONI format (subject/MT1__N3m/date/scan/*.nii)
         results = []
-        for subject_dir in sorted(input_dir.iterdir()):
-            if not subject_dir.is_dir():
-                continue
-            for name in ("T1.nii.gz", "T1.nii"):
-                t1 = subject_dir / name
-                if t1.exists():
-                    results.append({
-                        "subject_id": f"ADNI_{subject_dir.name}",
-                        "center": {"modality": "t1", "path": str(t1)},
-                        "moving": [],
-                    })
-                    break
-        log.info(f"ADNI: {len(results)} subjects")
+        niis = sorted(input_dir.rglob("*.nii"))
+        if not niis:
+            niis = sorted(input_dir.rglob("*.nii.gz"))
+
+        for f in niis:
+            # Extract subject ID + date from path: {subject}/MT1__N3m/{date}/{scan_id}/*.nii
+            parts = f.relative_to(input_dir).parts
+            subject_id = parts[0] if parts else "unknown"
+            date = parts[2] if len(parts) > 2 else "nodate"
+            date_short = date[:10].replace("-", "")
+            results.append({
+                "subject_id": f"ADNI_{subject_id}_{date_short}",
+                "center": {"modality": "t1", "path": str(f)},
+                "moving": [],
+            })
+        log.info(f"ADNI: {len(results)} T1 volumes")
         return results
 
 
