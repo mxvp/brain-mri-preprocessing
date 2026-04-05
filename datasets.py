@@ -418,9 +418,7 @@ class ADNI(Dataset):
     def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
         # Support both old format (subject/T1.nii) and new LONI format (subject/MT1__N3m/date/scan/*.nii)
         results = []
-        niis = sorted(input_dir.rglob("*.nii"))
-        if not niis:
-            niis = sorted(input_dir.rglob("*.nii.gz"))
+        niis = sorted(set(input_dir.rglob("*.nii")) | set(input_dir.rglob("*.nii.gz")))
 
         for f in niis:
             # Extract subject ID + date from path: {subject}/MT1__N3m/{date}/{scan_id}/*.nii
