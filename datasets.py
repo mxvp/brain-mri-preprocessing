@@ -411,26 +411,61 @@ class PPMI(Dataset):
 
 
 class ADNI(Dataset):
-    """ADNI — T1.nii per subject directory."""
+    """ADNI — NIfTI + DICOM T1 scans. Converts DICOMs during prepare."""
 
     name = "adni"
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
-        # Support both old format (subject/T1.nii) and new LONI format (subject/MT1__N3m/date/scan/*.nii)
+        output_dir.mkdir(parents=True, exist_ok=True)
         results = []
-        niis = sorted(set(input_dir.rglob("*.nii")) | set(input_dir.rglob("*.nii.gz")))
 
-        for f in niis:
-            # Extract subject ID + date from path: {subject}/MT1__N3m/{date}/{scan_id}/*.nii
-            parts = f.relative_to(input_dir).parts
-            subject_id = parts[0] if parts else "unknown"
-            date = parts[2] if len(parts) > 2 else "nodate"
-            date_short = date[:10].replace("-", "")
-            results.append({
-                "subject_id": f"ADNI_{subject_id}_{date_short}",
-                "center": {"modality": "t1", "path": str(f)},
-                "moving": [],
-            })
+        for subject_dir in sorted(input_dir.iterdir()):
+            if not subject_dir.is_dir():
+                continue
+            subject_id = subject_dir.name
+
+            for proc_dir in sorted(subject_dir.iterdir()):
+                if not proc_dir.is_dir():
+                    continue
+
+                for date_dir in sorted(proc_dir.iterdir()):
+                    if not date_dir.is_dir():
+                        continue
+                    date_short = date_dir.name[:10].replace("-", "")
+
+                    for scan_dir in sorted(date_dir.iterdir()):
+                        if not scan_dir.is_dir():
+                            continue
+
+                        # Check for existing NIfTI
+                        niis = sorted(scan_dir.glob("*.nii")) + sorted(scan_dir.glob("*.nii.gz"))
+                        if niis:
+                            results.append({
+                                "subject_id": f"ADNI_{subject_id}_{date_short}",
+                                "center": {"modality": "t1", "path": str(niis[0])},
+                                "moving": [],
+                            })
+                            continue
+
+                        # Check for DICOMs — convert
+                        dcms = sorted(scan_dir.glob("*.dcm"))
+                        if dcms:
+                            filename = f"ADNI_{subject_id}_{date_short}"
+                            out = output_dir / f"{filename}.nii.gz"
+                            if not out.exists():
+                                try:
+                                    _dcm2niix(scan_dir, output_dir, filename)
+                                    log.info(f"Converted DICOM: {subject_id} {date_short}")
+                                except Exception:
+                                    log.exception(f"ADNI dcm2niix failed: {subject_id} {date_short}")
+                                    continue
+                            if out.exists():
+                                results.append({
+                                    "subject_id": f"ADNI_{subject_id}_{date_short}",
+                                    "center": {"modality": "t1", "path": str(out)},
+                                    "moving": [],
+                                })
+
         log.info(f"ADNI: {len(results)} T1 volumes")
         return results
 
