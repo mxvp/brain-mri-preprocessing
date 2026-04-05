@@ -424,12 +424,14 @@ class ADNI(Dataset):
                 continue
             subject_id = subject_dir.name
 
-            # Collect best scan per date: NIfTI > DICOM
-            scans_by_date = {}  # date -> ("nii", path) or ("dcm", dir)
+            # Collect best scan per date: MT1 NIfTI > other NIfTI > DICOM
+            scans_by_date = {}  # date -> (priority, "nii"/"dcm", path)
+            # priority: 0=MT1+GradWarp, 1=MT1, 2=other NIfTI, 3=DICOM
 
             for proc_dir in sorted(subject_dir.iterdir()):
                 if not proc_dir.is_dir():
                     continue
+                pname = proc_dir.name.upper()
                 for date_dir in sorted(proc_dir.iterdir()):
                     if not date_dir.is_dir():
                         continue
@@ -440,13 +442,24 @@ class ADNI(Dataset):
                             continue
 
                         niis = list(scan_dir.glob("*.nii")) + list(scan_dir.glob("*.nii.gz"))
-                        if niis and scans_by_date.get(date_short, (None,))[0] != "nii":
-                            scans_by_date[date_short] = ("nii", sorted(niis)[0])
-                        elif not niis and list(scan_dir.glob("*.dcm")) and date_short not in scans_by_date:
-                            scans_by_date[date_short] = ("dcm", scan_dir)
+                        if niis:
+                            if "MT1" in pname and "GRADWARP" in pname:
+                                pri = 0
+                            elif "MT1" in pname:
+                                pri = 1
+                            else:
+                                pri = 2
+                            entry = (pri, "nii", sorted(niis)[0])
+                        elif list(scan_dir.glob("*.dcm")):
+                            entry = (3, "dcm", scan_dir)
+                        else:
+                            continue
+
+                        if date_short not in scans_by_date or entry[0] < scans_by_date[date_short][0]:
+                            scans_by_date[date_short] = entry
 
             # Process best scan per date
-            for date_short, (fmt, path) in sorted(scans_by_date.items()):
+            for date_short, (_, fmt, path) in sorted(scans_by_date.items()):
                 if fmt == "nii":
                     results.append({
                         "subject_id": f"ADNI_{subject_id}_{date_short}",
