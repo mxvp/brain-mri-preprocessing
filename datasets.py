@@ -414,9 +414,13 @@ class ADNI(Dataset):
     """ADNI — NIfTI + DICOM T1 scans. Picks best processing variant per subject+date."""
 
     name = "adni"
-    # Prefer most-processed NIfTI variants (higher = better)
-    PROC_PRIORITY = ["MT1__GradWarp__N3m", "MT1__N3m", "MPR__GradWarp__B1_Correction__N3",
-                     "MPR-R__GradWarp__B1_Correction__N3", "MPR__GradWarp__N3", "MPR__N3"]
+    # Prefer most-processed NIfTI variants (lower index = higher priority)
+    PROC_PRIORITY = [
+        "MT1__GradWarp__N3m", "MT1__N3m",
+        "MPR__GradWarp__B1_Correction__N3", "MPR-R__GradWarp__B1_Correction__N3",
+        "MPR__GradWarp__N3", "MPR-R__GradWarp__N3",
+        "MPR____N3", "MPR-R____N3",
+    ]
 
     def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
         output_dir.mkdir(parents=True, exist_ok=True)
