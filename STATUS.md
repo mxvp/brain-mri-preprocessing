@@ -50,6 +50,20 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | HCP Aging | ~5,578       | Need external SSD for 2TB Aspera    |
 | HBN       | ~2,000       | Killed download (pediatric, 1TB+, low priority) |
 
+## Disease/population coverage
+
+| Category | Datasets |
+|----------|----------|
+| Healthy | IXI, HCP-YA, NKI, CORR, FCON1000, OASIS controls, ADNI CN, ABIDE controls, PPMI controls |
+| Alzheimer's/dementia | ADNI, OASIS-1/2 |
+| Brain tumors (GBM/glioma) | UPENN, TCGA, UCSF, Stanford, BraTS |
+| Parkinson's | PPMI |
+| Autism | ABIDE I/II |
+| Schizophrenia | SCHIZO |
+| ADHD | ADHD200 |
+| Meningioma | BraTS-MEN |
+| Pediatric tumors | BraTS-PED |
+
 ## Not usable
 
 - `ADNI/processed/`, `SCHIZO/processed/norm*`, `TCGA/processed/` — MNI152 atlas, wrong space.
