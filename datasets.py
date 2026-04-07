@@ -692,6 +692,27 @@ class HCP(Dataset):
         return results
 
 
+class FmriprepMNI(Dataset):
+    """Datasets with fmriprep MNI outputs — already skull-stripped + bias-corrected.
+    Re-registers from MNI to SRI24. Works for: ADHD200, CORR, and similar."""
+
+    name = "fmriprep_mni"
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
+        files = sorted(input_dir.rglob("*space-MNI*desc-preproc_T1w.nii.gz"))
+        results = []
+        for f in files:
+            subject_id = f.name.split("_space-")[0]
+            results.append({
+                "subject_id": subject_id,
+                "center": {"modality": "t1", "path": str(f)},
+                "moving": [],
+                "pre_skull_stripped": True,
+            })
+        log.info(f"fmriprep MNI: {len(results)} T1w volumes from {input_dir.name}")
+        return results
+
+
 REGISTRY: dict[str, type[Dataset]] = {
     "ixi": IXI,
     "oasis1": OASIS1,
@@ -701,7 +722,8 @@ REGISTRY: dict[str, type[Dataset]] = {
     "adni": ADNI,
     "schizo": Schizo,
     "stanford": Stanford,
-    "bids_defaced": BIDSDefaced,  # ABIDE I/II, NKI, CORR, FCON1000, HBN, ADHD200
+    "bids_defaced": BIDSDefaced,  # ABIDE I/II, NKI, CORR, FCON1000
+    "fmriprep_mni": FmriprepMNI,  # ADHD200, CORR (fmriprep outputs)
     "hcp": HCP,
     # TCGA, UCSF, UPenn are already preprocessed in SRI24 — no pipeline needed.
     # Classes kept below for reference / inventory if ever needed.
