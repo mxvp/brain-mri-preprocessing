@@ -713,6 +713,26 @@ class FmriprepMNI(Dataset):
         return results
 
 
+class FCON1000(Dataset):
+    """FCON1000 — skull-stripped T1w in derivatives/ per site. Native space."""
+
+    name = "fcon1000"
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
+        files = sorted(input_dir.rglob("derivatives/*T1w_brain.nii.gz"))
+        results = []
+        for f in files:
+            subject_id = f.name.replace("_T1w_brain.nii.gz", "")
+            results.append({
+                "subject_id": f"FCON_{subject_id}",
+                "center": {"modality": "t1", "path": str(f)},
+                "moving": [],
+                "pre_skull_stripped": True,
+            })
+        log.info(f"FCON1000: {len(results)} T1w volumes")
+        return results
+
+
 REGISTRY: dict[str, type[Dataset]] = {
     "ixi": IXI,
     "oasis1": OASIS1,
@@ -724,6 +744,7 @@ REGISTRY: dict[str, type[Dataset]] = {
     "stanford": Stanford,
     "bids_defaced": BIDSDefaced,  # ABIDE I/II, NKI, CORR, FCON1000
     "fmriprep_mni": FmriprepMNI,  # ADHD200, CORR (fmriprep outputs)
+    "fcon1000": FCON1000,
     "hcp": HCP,
     # TCGA, UCSF, UPenn are already preprocessed in SRI24 — no pipeline needed.
     # Classes kept below for reference / inventory if ever needed.
