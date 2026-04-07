@@ -85,6 +85,18 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | SCHIZO | Research DUA | No |
 | UK Biobank | Restricted DUA + fees | No (needs commercial license) |
 
+## Not yet explored
+
+| Dataset | Est. subjects | Population | Source |
+|---------|---------------|-----------|--------|
+| CamCAN | ~650 | Healthy, 18-88yo | camcan-archive.mrc-cbu.cam.ac.uk |
+| AOMIC ID1000 | ~1,000 | Healthy | OpenNeuro |
+| DLBS | ~315 | Healthy, lifespan | OpenNeuro |
+| SALD | ~494 | Healthy adults | NITRC |
+| SLIM | ~600 | Healthy, longitudinal | NITRC |
+| ENIGMA | 10,000+ | Mixed (consortium) | Via working groups |
+| OpenNeuro (bulk) | ~114K (OpenMind) | Mixed, 800 datasets | openneuro.org |
+
 ## Not usable
 
 - `ADNI/processed/`, `SCHIZO/processed/norm*`, `TCGA/processed/` — MNI152 atlas, wrong space.
