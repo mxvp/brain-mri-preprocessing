@@ -15,25 +15,25 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | SCHIZO   | 670     | T1, T2               | Reg only (pre-stripped)         |
 | OASIS-1  | 436     | T1                   | T88 → SRI24                    |
 | OASIS-2  | 373     | T1                   | Raw permute → SRI24            |
-| IXI      | ~795    | T1, T2               | Full pipeline                   |
-| PPMI     | ~3,908  | T1, T2, FLAIR        | Full pipeline                   |
+| IXI      | 1,159   | T1, T2               | Full pipeline                   |
+| PPMI     | 3,908   | T1, T2, FLAIR        | Full pipeline                   |
+| ABIDE I  | 984     | T1                   | SS atlas + CoM                  |
+| ABIDE II | 1,430   | T1                   | SS atlas + CoM                  |
+| HCP-YA   | 2,226   | T1, T2               | Pre-stripped → SRI24            |
+| NKI      | 2,208   | T1                   | SS atlas + CoM                  |
 
-**Subtotal done: ~17,511 volumes**
+**Subtotal done: ~24,723 volumes**
 
-## Preprocessing running (weekend batch)
+## Preprocessing running
 
-| Dataset    | Est. volumes | GPUs | Status                                    |
-| ---------- | ------------ | ---- | ----------------------------------------- |
-| ADNI full  | ~10,000      | GPU  | Running (~8K done)                        |
-| ABIDE I    | 1,102        | GPU  | Running (SS atlas + CoM)                  |
-| ABIDE II   | 1,427        | GPU  | Running (SS atlas + CoM)                  |
-| HCP-YA     | 2,226        | GPU  | Done                                      |
-| NKI        | 2,455        | GPU  | Almost done                               |
-| CORR       | 546          | CPU  | Running (fmriprep MNI → SRI24)            |
-| FCON1000   | 1,250        | CPU  | Running (pre-stripped, native → SRI24)     |
-| ADHD200    | 599          | CPU  | Running (fmriprep MNI → SRI24)            |
+| Dataset    | Est. volumes | Compute | Status                                    |
+| ---------- | ------------ | ------- | ----------------------------------------- |
+| ADNI full  | ~10,000      | GPU     | ~8,141 done, ~2K remaining                |
+| CORR       | 546          | CPU     | Running (fmriprep MNI → SRI24)            |
+| FCON1000   | 1,250        | CPU     | Running (pre-stripped, native → SRI24)     |
+| ADHD200    | 599          | CPU     | Running (fmriprep MNI → SRI24)            |
 
-**Subtotal running: ~19,605 volumes**
+**Subtotal running: ~12,395 volumes**
 
 ## Pending access / download
 
@@ -43,7 +43,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | OASIS-4   | ~600+        | Access requested                    |
 | ABCD      | ~12,000      | Need PI sign-off for NDA (pediatric)|
 | HCP Aging | ~5,578       | Need external SSD for 2TB Aspera    |
-| HBN       | ~2,000       | Killed download (pediatric, 1TB+, low priority) |
+| HBN       | ~2,000       | Killed download (pediatric, low priority) |
 
 ## Disease/population coverage
 
@@ -69,7 +69,8 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 - OASIS-2: Raw axis permutation + SRI24 registration
 - SCHIZO: SS atlas + CoM + skip HD-BET (`pre_skull_stripped`)
 - ABIDE/NKI: SS atlas + CoM for defaced inputs (`use_ss_atlas` + `com_align`)
-- HCP: SS atlas + CoM, pre-stripped (`pre_skull_stripped`)
+- HCP/FCON1000: SS atlas + CoM, pre-stripped (`pre_skull_stripped`)
+- ADHD200/CORR: fmriprep MNI → SRI24 (`pre_skull_stripped`)
 - ADNI full: dedup by subject+date, prefer best NIfTI variant, DICOM fallback
 - Multi-modal: T1 as center, others as moving
 
@@ -77,8 +78,8 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
 | Status             | Volumes      |
 | ------------------ | ------------ |
-| Done               | ~17,511      |
-| Running            | ~19,605      |
+| Done               | ~24,723      |
+| Running            | ~12,395      |
 | Pending            | ~23,020+     |
-| **Available soon** | **~37,116**  |
-| **Projected**      | **~60,136+** |
+| **Available soon** | **~37,118**  |
+| **Projected**      | **~60,138+** |
