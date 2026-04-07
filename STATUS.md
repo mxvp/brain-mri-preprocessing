@@ -60,6 +60,28 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | Meningioma | BraTS-MEN |
 | Pediatric tumors | BraTS-PED |
 
+## Data licenses
+
+| Dataset | License | Commercial OK? |
+|---------|---------|----------------|
+| IXI | CC BY-SA 3.0 | Yes (with share-alike) |
+| UPENN | CC BY 4.0 (TCIA) | Yes |
+| TCGA | CC BY 4.0 (TCIA) | Yes |
+| UCSF | CC BY 4.0 (TCIA) | Yes |
+| BraTS-GLI/MEN/PED | CC BY 4.0 | Yes |
+| FCON1000 | CC BY (1000 FCP) | Yes |
+| CORR | CC BY (1000 FCP) | Yes |
+| HBN | CC BY-NC-SA (older) / CC BY 4.0 (newer) | Partially |
+| ABIDE I/II | CC BY-NC-SA | No |
+| NKI | CC BY-NC | No |
+| ADHD200 | CC BY-NC | No |
+| ADNI | Research DUA | No |
+| PPMI | Research DUA | No |
+| OASIS | Research DUA (non-commercial only) | No |
+| HCP | Open Access DUA | No (unclear) |
+| SCHIZO | Research DUA | No |
+| UK Biobank | Restricted DUA + fees | No (needs commercial license) |
+
 ## Not usable
 
 - `ADNI/processed/`, `SCHIZO/processed/norm*`, `TCGA/processed/` — MNI152 atlas, wrong space.
