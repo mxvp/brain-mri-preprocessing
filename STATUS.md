@@ -24,21 +24,16 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
 | Dataset    | Est. volumes | GPUs | Status                                    |
 | ---------- | ------------ | ---- | ----------------------------------------- |
-| ADNI full  | ~10,000      | 8    | Preparing + submitting                    |
-| ABIDE I    | 1,102        | 3    | Running (SS atlas + CoM)                  |
-| ABIDE II   | 1,427        | 4    | Running (SS atlas + CoM)                  |
-| HCP-YA     | 2,226        | 4    | Running (pre-stripped, ~742 remaining)    |
-| NKI        | 2,455        | 4    | Running (SS atlas + CoM)                  |
+| ADNI full  | ~10,000      | GPU  | Running (~8K done)                        |
+| ABIDE I    | 1,102        | GPU  | Running (SS atlas + CoM)                  |
+| ABIDE II   | 1,427        | GPU  | Running (SS atlas + CoM)                  |
+| HCP-YA     | 2,226        | GPU  | Done                                      |
+| NKI        | 2,455        | GPU  | Almost done                               |
+| CORR       | 546          | CPU  | Running (fmriprep MNI → SRI24)            |
+| FCON1000   | 1,250        | CPU  | Running (pre-stripped, native → SRI24)     |
+| ADHD200    | 599          | CPU  | Running (fmriprep MNI → SRI24)            |
 
-**Subtotal running: ~17,210 volumes**
-
-## Downloaded, needs preprocessing
-
-| Dataset    | Est. volumes | Notes                                     |
-| ---------- | ------------ | ----------------------------------------- |
-| CORR       | ~1,600       | Downloaded (301GB, healthy adults)         |
-| FCON1000   | ~1,000       | Downloaded (13GB, healthy adults)          |
-| ADHD200    | ~970         | Downloaded (212GB, pediatric, low priority)|
+**Subtotal running: ~19,605 volumes**
 
 ## Pending access / download
 
@@ -83,8 +78,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | Status             | Volumes      |
 | ------------------ | ------------ |
 | Done               | ~17,511      |
-| Running            | ~17,210      |
-| Downloaded         | ~3,570       |
+| Running            | ~19,605      |
 | Pending            | ~23,020+     |
-| **Available soon** | **~38,291**  |
-| **Projected**      | **~61,311+** |
+| **Available soon** | **~37,116**  |
+| **Projected**      | **~60,136+** |
