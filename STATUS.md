@@ -44,7 +44,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | ABCD      | ~12,000      | Need PI sign-off for NDA (pediatric)|
 | HCP Aging | ~5,578       | Need external SSD for 2TB Aspera    |
 | HBN       | ~2,000       | Killed download (pediatric, low priority) |
-| UK Biobank| ~50,000      | Need to apply, months for access          |
+| UK Biobank| ~100,000+    | Need to apply, months for access (100K first scans + 60K repeats) |
 
 ## Disease/population coverage
 
@@ -81,6 +81,6 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | ------------------ | ------------ |
 | Done               | ~24,723      |
 | Running            | ~12,395      |
-| Pending            | ~73,020+     |
+| Pending            | ~123,020+    |
 | **Available soon** | **~37,118**  |
-| **Projected**      | **~110,138+**|
+| **Projected**      | **~160,138+**|
