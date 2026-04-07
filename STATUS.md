@@ -97,10 +97,6 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | ENIGMA | 10,000+ | Mixed (consortium) | Via working groups |
 | OpenNeuro (bulk) | ~114K (OpenMind) | Mixed, 800 datasets | openneuro.org |
 
-## Not usable
-
-- `ADNI/processed/`, `SCHIZO/processed/norm*`, `TCGA/processed/` — MNI152 atlas, wrong space.
-
 ## Pipeline fixes — summary
 
 - OASIS-1: T88 → SRI24 re-registration
