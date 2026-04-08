@@ -32,11 +32,11 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | CORR       | 546          | CPU     | Running (fmriprep MNI → SRI24)            |
 | FCON1000   | 1,250        | CPU     | Running (pre-stripped, native → SRI24)     |
 | ADHD200    | 599          | CPU     | Running (fmriprep MNI → SRI24)            |
-| BGSP       | ~1,001       | CPU     | Downloading (skull-stripped 1.2mm, S3)     |
-| NKI2       | ~223         | CPU     | Downloading (skull-stripped, S3)           |
-| HBN        | ~2,615       | GPU     | Downloading raw T1w (S3)                  |
+| BGSP       | 1,636        | CPU     | Running (skull-stripped 1.2mm, 3 jobs)     |
+| NKI2       | 222          | CPU     | Running (MNI → SRI24)                     |
+| HBN        | 2,136        | CPU     | Running (qsiprep MNI → SRI24, 3 jobs)    |
 
-**Subtotal running/downloading: ~16,234 volumes**
+**Subtotal running: ~20,228 volumes**
 
 ## Pending access / download
 
@@ -46,7 +46,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | OASIS-4   | ~600+        | Access requested                    |
 | ABCD      | ~12,000      | Need PI sign-off for NDA (pediatric)|
 | HCP Aging | ~5,578       | Need external SSD for 2TB Aspera    |
-| HBN       | ~2,615       | Moved to running (downloading raw T1w + qsiprep MNI) |
+| HBN (raw) | ~2,615       | Downloaded, needs GPU for non-qsiprep subjects |
 | UK Biobank| ~100,000+    | Need to apply, months for access (100K first scans + 60K repeats) |
 
 ## Disease/population coverage
@@ -115,5 +115,5 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | Done               | ~24,723      |
 | Running            | ~12,395      |
 | Pending            | ~118,020+    |
-| **Available soon** | **~40,957**  |
-| **Projected**      | **~158,977+**|
+| **Available soon** | **~44,951**  |
+| **Projected**      | **~162,971+**|
