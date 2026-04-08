@@ -713,6 +713,26 @@ class FmriprepMNI(Dataset):
         return results
 
 
+class BGSP(Dataset):
+    """BGSP — CPAC skull-stripped T1w at 1.2mm iso, native space."""
+
+    name = "bgsp"
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
+        files = sorted(input_dir.rglob("anatomical_brain/*.nii.gz"))
+        results = []
+        for f in files:
+            subject_id = f.parent.parent.name
+            results.append({
+                "subject_id": f"BGSP_{subject_id}",
+                "center": {"modality": "t1", "path": str(f)},
+                "moving": [],
+                "pre_skull_stripped": True,
+            })
+        log.info(f"BGSP: {len(results)} T1w volumes")
+        return results
+
+
 class FCON1000(Dataset):
     """FCON1000 — skull-stripped T1w in derivatives/ per site. Native space."""
 
@@ -744,6 +764,7 @@ REGISTRY: dict[str, type[Dataset]] = {
     "stanford": Stanford,
     "bids_defaced": BIDSDefaced,  # ABIDE I/II, NKI, CORR, FCON1000
     "fmriprep_mni": FmriprepMNI,  # ADHD200, CORR (fmriprep outputs)
+    "bgsp": BGSP,
     "fcon1000": FCON1000,
     "hcp": HCP,
     # TCGA, UCSF, UPenn are already preprocessed in SRI24 — no pipeline needed.
