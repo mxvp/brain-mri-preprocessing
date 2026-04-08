@@ -21,22 +21,15 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | ABIDE II | 1,430   | T1                   | SS atlas + CoM                  |
 | HCP-YA   | 2,226   | T1, T2               | Pre-stripped → SRI24            |
 | NKI      | 2,208   | T1                   | SS atlas + CoM                  |
+| ADNI full| 10,912  | T1                   | Full pipeline (GPU)             |
+| CORR     | 546     | T1                   | fmriprep MNI → SRI24            |
+| FCON1000 | 1,250   | T1                   | Pre-stripped, native → SRI24    |
+| ADHD200  | 599     | T1                   | fmriprep MNI → SRI24            |
+| BGSP     | 1,636   | T1                   | Skull-stripped 1.2mm → SRI24    |
+| NKI2     | 222     | T1                   | MNI → SRI24                     |
+| HBN      | 2,136   | T1                   | qsiprep MNI → SRI24             |
 
-**Subtotal done: ~24,723 volumes**
-
-## Preprocessing running
-
-| Dataset    | Est. volumes | Compute | Status                                    |
-| ---------- | ------------ | ------- | ----------------------------------------- |
-| ADNI full  | ~10,000      | GPU     | ~8,141 done, ~2K remaining                |
-| CORR       | 546          | CPU     | Running (fmriprep MNI → SRI24)            |
-| FCON1000   | 1,250        | CPU     | Running (pre-stripped, native → SRI24)     |
-| ADHD200    | 599          | CPU     | Running (fmriprep MNI → SRI24)            |
-| BGSP       | 1,636        | CPU     | Running (skull-stripped 1.2mm, 3 jobs)     |
-| NKI2       | 222          | CPU     | Running (MNI → SRI24)                     |
-| HBN        | 2,136        | CPU     | Running (qsiprep MNI → SRI24, 3 jobs)    |
-
-**Subtotal running: ~20,228 volumes**
+**Subtotal done: ~45,863 volumes**
 
 ## Pending access / download
 
@@ -112,8 +105,6 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
 | Status             | Volumes      |
 | ------------------ | ------------ |
-| Done               | ~24,723      |
-| Running            | ~12,395      |
+| Done               | ~45,863      |
 | Pending            | ~118,020+    |
-| **Available soon** | **~44,951**  |
-| **Projected**      | **~162,971+**|
+| **Projected**      | **~163,883+**|
