@@ -46,7 +46,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | OASIS-4   | ~600+        | Access requested                    |
 | ABCD      | ~12,000      | Need PI sign-off for NDA (pediatric)|
 | HCP Aging | ~5,578       | Need external SSD for 2TB Aspera    |
-| HBN (raw) | ~2,615       | Downloaded, needs GPU for non-qsiprep subjects |
+| HBN (raw) | ~479         | Remaining subjects without qsiprep, needs GPU |
 | UK Biobank| ~100,000+    | Need to apply, months for access (100K first scans + 60K repeats) |
 
 ## Disease/population coverage
