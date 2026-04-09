@@ -29,7 +29,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | NKI2     | 222     | T1                   | MNI → SRI24                     |
 | HBN      | 2,136   | T1                   | qsiprep MNI → SRI24             |
 
-**Subtotal done: ~45,863 volumes**
+**Subtotal done: ~45,863 volumes across 200+ sites worldwide** (ADNI ~60, FCON1000 ~35, PPMI ~33, CORR ~30, ABIDE I/II 36, ADHD200 8, HBN 4, IXI 3, BGSP 2, BraTS/TCGA pooled multi-institution, rest single-site)
 
 ## Pending access / download
 
@@ -46,7 +46,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
 | Category | Datasets |
 |----------|----------|
-| Healthy | IXI, HCP-YA, NKI, CORR, FCON1000, OASIS controls, ADNI CN, ABIDE controls, PPMI controls |
+| Healthy | IXI, HCP-YA, NKI, NKI2, CORR, FCON1000, BGSP, OASIS controls, ADNI CN, ABIDE controls, PPMI controls, ADHD200 controls |
 | Alzheimer's/dementia | ADNI, OASIS-1/2 |
 | Brain tumors (GBM/glioma) | UPENN, TCGA, UCSF, Stanford, BraTS |
 | Parkinson's | PPMI |
@@ -55,6 +55,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | ADHD | ADHD200 |
 | Meningioma | BraTS-MEN |
 | Pediatric tumors | BraTS-PED |
+| Pediatric psychiatric (mixed) | HBN (ADHD, ASD, anxiety, learning disorders) |
 
 ## Data licenses
 
@@ -69,7 +70,9 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | CORR | CC BY (1000 FCP) | Yes |
 | HBN | CC BY-NC-SA (older) / CC BY 4.0 (newer) | Partially |
 | ABIDE I/II | CC BY-NC-SA | No |
-| NKI | CC BY-NC | No |
+| NKI / NKI2 | CC BY-NC | No |
+| BGSP | BGSP Data Use Terms (non-commercial) | No |
+| Stanford | Internal (in-house) | N/A |
 | ADHD200 | CC BY-NC | No |
 | ADNI | Research DUA | No |
 | PPMI | Research DUA | No |
