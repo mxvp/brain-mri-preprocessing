@@ -41,8 +41,9 @@ log = logging.getLogger(__name__)
 
 DATASET_MAP = {
     # Preprocessed subdir name → (master CSV relative path, parser function name)
+    # NOTE: adni_old deliberately excluded — it's superseded by adni_full and
+    # the files would duplicate subjects with different naming.
     "adni_full": ("ADNI/adni_master.csv", "parse_adni"),
-    "adni_old":  ("ADNI/adni_master.csv", "parse_adni_old"),
     "ppmi":      ("PPMI/ppmi_master.csv", "parse_ppmi"),
     "oasis1":    ("OASIS1/oasis1_master.csv", "parse_oasis1"),
     "oasis2":    ("OASIS2/oasis2_master.csv", "parse_oasis2"),
@@ -60,9 +61,31 @@ DATASET_MAP = {
     "nki":       ("NKI/nki_master.csv", "parse_nki"),
     "nki2":      ("NKI2/nki2_master.csv", "parse_nki2"),
     # External paths (not under preprocessed/)
-    "UPENN":     ("UPENN/upenn_master.csv", "parse_upenn"),
     "normalize": ("UPENN/upenn_master.csv", "parse_upenn"),  # UPENN lives at .../UPENN/normalize
     "UCSF-PDGM-v3": ("UCSF/ucsf_master.csv", "parse_ucsf"),
+}
+
+
+# Canonical dataset names (applied in output): rename parent-dir keys to
+# stable lowercase identifiers the downstream pipeline expects.
+DATASET_CANONICAL_NAME = {
+    "adni_full":    "adni",
+    "hcp_ya":       "hcp_ya",
+    "normalize":    "upenn",
+    "UCSF-PDGM-v3": "ucsf",
+}
+
+
+# Collapse aliases for the harmonized `dx` column.
+# CN (ADNI/OASIS cognitively normal) == HC (healthy control) for conditioning.
+DX_ALIASES = {
+    "CN": "HC",
+}
+
+# Collapse aliases for the `modality` column. t1gd (Stanford) == t1c (UCSF):
+# both are post-gadolinium contrast-enhanced T1.
+MODALITY_ALIASES = {
+    "t1gd": "t1c",
 }
 
 
@@ -460,6 +483,15 @@ def build_volumes(files_txt: Path, metadata_root: Path, output_csv: Path):
         log.info(f"[{ds_key}] {matched}/{len(ds_paths)} files matched to clinical data")
 
     df = pd.DataFrame(all_rows)
+
+    # Canonicalize dataset names (normalize → upenn, UCSF-PDGM-v3 → ucsf, etc.)
+    df["dataset"] = df["dataset"].replace(DATASET_CANONICAL_NAME)
+
+    # Collapse dx aliases (CN → HC)
+    df["dx"] = df["dx"].replace(DX_ALIASES)
+
+    # Collapse modality aliases (t1gd → t1c)
+    df["modality"] = df["modality"].replace(MODALITY_ALIASES)
 
     # Put the core columns first
     lead = ["file_path", "dataset", "subject_id", "session_id", "modality", "scan_date",
