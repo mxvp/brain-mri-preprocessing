@@ -41,6 +41,9 @@ SCHEMA = [
     "gds",              # ADNI + PPMI (depression, 0-15)
     "scopa_aut",        # PPMI (autonomic symptoms)
     "apoe",             # "E3/E3" / "E3/E4" / ...
+    "tumor_grade",      # WHO CNS grade 2/3/4 (UCSF) — gliomas only
+    "idh_status",       # "wildtype" / "mutant" (UCSF + UPENN)
+    "mgmt_status",      # "methylated" / "unmethylated" (UCSF + UPENN)
     "scanner_manufacturer",
     "scanner_model",
     "field_strength",
@@ -565,8 +568,30 @@ def extract_tcga(meta_dir: Path) -> pd.DataFrame:
 
 
 def extract_upenn(meta_dir: Path) -> pd.DataFrame:
-    """UPENN-GBM: one row per subject, sex/age/survival/IDH/MGMT/KPS."""
+    """UPENN-GBM: one row per subject, all grade IV glioblastoma.
+    Emits IDH + MGMT molecular markers (no grade column — all GBM)."""
     df = _read_csv(meta_dir / "UPENN-GBM_clinical_info_v2.1.csv")
+
+    def _idh(s):
+        if pd.isna(s):
+            return pd.NA
+        s = str(s).strip().lower()
+        if s == "wildtype":
+            return "wildtype"
+        if s == "mutated":
+            return "mutant"
+        return pd.NA  # "NOS/NEC" etc.
+
+    def _mgmt(s):
+        if pd.isna(s):
+            return pd.NA
+        s = str(s).strip().lower()
+        if s == "methylated":
+            return "methylated"
+        if s == "unmethylated":
+            return "unmethylated"
+        return pd.NA  # "Not Available", "Indeterminate"
+
     out = pd.DataFrame([
         _na_row(
             dataset="UPENN",
@@ -576,6 +601,9 @@ def extract_upenn(meta_dir: Path) -> pd.DataFrame:
             sex={"M": "M", "F": "F"}.get(str(row["Gender"]).strip()),
             dx="GBM",
             dx_detail=f"IDH1={row['IDH1']} | MGMT={row['MGMT']} | KPS={row['KPS']}",
+            tumor_grade=4,  # UPENN-GBM is by definition grade IV
+            idh_status=_idh(row["IDH1"]),
+            mgmt_status=_mgmt(row["MGMT"]),
             modality="T1,T1c,T2,FLAIR",
         )
         for _, row in df.iterrows()
@@ -585,15 +613,42 @@ def extract_upenn(meta_dir: Path) -> pd.DataFrame:
 
 def extract_ucsf(meta_dir: Path) -> pd.DataFrame:
     """UCSF-PDGM: one row per subject, split by WHO CNS grade.
-    Grade IV → GBM; Grade II/III → Glioma (LGG + grade III astrocytoma)."""
+    Grade IV → GBM; Grade II/III → Glioma (LGG + grade III astrocytoma).
+    Also emits molecular markers: tumor_grade, idh_status, mgmt_status."""
     df = _read_csv(meta_dir / "UCSF-PDGM-metadata_v2.csv")
 
     def _dx_from_grade(grade) -> str:
         try:
             g = int(grade)
         except (ValueError, TypeError):
-            return "Glioma"  # missing grade → fall back to generic glioma
+            return "Glioma"
         return "GBM" if g == 4 else "Glioma"
+
+    def _grade(g):
+        try:
+            return int(g)
+        except (ValueError, TypeError):
+            return pd.NA
+
+    def _idh(s):
+        if pd.isna(s):
+            return pd.NA
+        s = str(s).lower()
+        if "wildtype" in s:
+            return "wildtype"
+        if "mut" in s or "r132" in s or "r172" in s:
+            return "mutant"
+        return pd.NA
+
+    def _mgmt(s):
+        if pd.isna(s):
+            return pd.NA
+        s = str(s).lower().strip()
+        if s == "positive" or "methylated" in s and "unmeth" not in s:
+            return "methylated"
+        if s == "negative" or "unmethylated" in s:
+            return "unmethylated"
+        return pd.NA
 
     out = pd.DataFrame([
         _na_row(
@@ -604,6 +659,9 @@ def extract_ucsf(meta_dir: Path) -> pd.DataFrame:
             sex=str(row["Sex"]).strip() if pd.notna(row["Sex"]) else pd.NA,
             dx=_dx_from_grade(row["WHO CNS Grade"]),
             dx_detail=f"WHO={row['WHO CNS Grade']} | {row['Final pathologic diagnosis (WHO 2021)']} | MGMT={row['MGMT status']} | 1p19q={row['1p/19q']} | IDH={row['IDH']}",
+            tumor_grade=_grade(row["WHO CNS Grade"]),
+            idh_status=_idh(row["IDH"]),
+            mgmt_status=_mgmt(row["MGMT status"]),
             modality="T1,T1c,T2,FLAIR",
         )
         for _, row in df.iterrows()

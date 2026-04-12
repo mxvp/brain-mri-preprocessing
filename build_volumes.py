@@ -441,6 +441,8 @@ def build_volumes(files_txt: Path, metadata_root: Path, output_csv: Path):
                     # mass effect). No per-subject pathology available.
                     row["dx"] = "GBM"
                     row["dx_detail"] = "Stanford tumor cohort (weak GBM label from cohort-level imaging review)"
+                    row["tumor_grade"] = 4  # weak cohort-level label
+                    # IDH/MGMT stay NaN (no pathology)
                 elif ds_key == "bgsp":
                     row["dx"] = "HC"
                     row["dx_detail"] = "BGSP healthy (clinical pending DUA)"
