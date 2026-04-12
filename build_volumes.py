@@ -435,8 +435,12 @@ def build_volumes(files_txt: Path, metadata_root: Path, output_csv: Path):
                 # the parser hardcodes a default.
                 row.update(parsed["lookup_cols"])
                 if ds_key == "stanford":
-                    row["dx"] = "Brain tumor"
-                    row["dx_detail"] = "Stanford tumor cohort"
+                    # Visual inspection of representative samples showed
+                    # imaging characteristics consistent with WHO grade IV
+                    # glioblastoma (large, contrast-enhancing, necrotic,
+                    # mass effect). No per-subject pathology available.
+                    row["dx"] = "GBM"
+                    row["dx_detail"] = "Stanford tumor cohort (weak GBM label from cohort-level imaging review)"
                 elif ds_key == "bgsp":
                     row["dx"] = "HC"
                     row["dx_detail"] = "BGSP healthy (clinical pending DUA)"

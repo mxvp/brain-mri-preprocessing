@@ -584,8 +584,17 @@ def extract_upenn(meta_dir: Path) -> pd.DataFrame:
 
 
 def extract_ucsf(meta_dir: Path) -> pd.DataFrame:
-    """UCSF-PDGM: one row per subject, WHO grade/diagnosis/MGMT/1p19q/IDH."""
+    """UCSF-PDGM: one row per subject, split by WHO CNS grade.
+    Grade IV → GBM; Grade II/III → Glioma (LGG + grade III astrocytoma)."""
     df = _read_csv(meta_dir / "UCSF-PDGM-metadata_v2.csv")
+
+    def _dx_from_grade(grade) -> str:
+        try:
+            g = int(grade)
+        except (ValueError, TypeError):
+            return "Glioma"  # missing grade → fall back to generic glioma
+        return "GBM" if g == 4 else "Glioma"
+
     out = pd.DataFrame([
         _na_row(
             dataset="UCSF",
@@ -593,7 +602,7 @@ def extract_ucsf(meta_dir: Path) -> pd.DataFrame:
             scan_id=row["ID"],
             age_at_scan=pd.to_numeric(row["Age at MRI"], errors="coerce"),
             sex=str(row["Sex"]).strip() if pd.notna(row["Sex"]) else pd.NA,
-            dx="Glioma",
+            dx=_dx_from_grade(row["WHO CNS Grade"]),
             dx_detail=f"WHO={row['WHO CNS Grade']} | {row['Final pathologic diagnosis (WHO 2021)']} | MGMT={row['MGMT status']} | 1p19q={row['1p/19q']} | IDH={row['IDH']}",
             modality="T1,T1c,T2,FLAIR",
         )
