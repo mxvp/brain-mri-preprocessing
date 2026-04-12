@@ -10,7 +10,6 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | TCGA     | 668     | T1, T1Gd, T2, FLAIR | Already in SRI24                |
 | UCSF     | 2,004   | T1, T1c, T2, FLAIR  | Already in SRI24, bias-corrected|
 | BraTS    | ~5,000  | T1, T1c, T2, FLAIR  | Already in SRI24                |
-| ADNI old | 815     | T1                   | Full pipeline                   |
 | Stanford | 158     | T1Gd, FLAIR          | Full pipeline                   |
 | SCHIZO   | 670     | T1, T2               | Reg only (pre-stripped)         |
 | OASIS-1  | 436     | T1                   | T88 → SRI24                    |
@@ -21,7 +20,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | ABIDE II | 1,430   | T1                   | SS atlas + CoM                  |
 | HCP-YA   | 2,226   | T1, T2               | Pre-stripped → SRI24            |
 | NKI      | 2,208   | T1                   | SS atlas + CoM                  |
-| ADNI full| 10,912  | T1                   | Full pipeline (GPU)             |
+| ADNI     | 10,912  | T1                   | Full pipeline (GPU)             |
 | CORR     | 546     | T1                   | fmriprep MNI → SRI24            |
 | FCON1000 | 1,250   | T1                   | Pre-stripped, native → SRI24    |
 | ADHD200  | 599     | T1                   | fmriprep MNI → SRI24            |
@@ -29,7 +28,7 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | NKI2     | 222     | T1                   | MNI → SRI24                     |
 | HBN      | 2,136   | T1                   | qsiprep MNI → SRI24             |
 
-**Subtotal done: ~45,863 volumes across 200+ sites worldwide** (ADNI ~60, FCON1000 ~35, PPMI ~33, CORR ~30, ABIDE I/II 36, ADHD200 8, HBN 4, IXI 3, BGSP 2, BraTS/TCGA pooled multi-institution, rest single-site)
+**Subtotal done: ~45,048 volumes across 200+ sites worldwide** (ADNI ~60, FCON1000 ~35, PPMI ~33, CORR ~30, ABIDE I/II 36, ADHD200 8, HBN 4, IXI 3, BGSP 2, BraTS/TCGA pooled multi-institution, rest single-site)
 
 ## Pending access / download
 
@@ -93,6 +92,54 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 | ENIGMA | 10,000+ | Mixed (consortium) | Via working groups |
 | OpenNeuro (bulk) | ~114K (OpenMind) | Mixed, 800 datasets | openneuro.org |
 
+## Metadata / phenotypes
+
+Raw clinical sources live in `data/metadata/<DATASET>/` (gitignored). Code that builds harmonized masters from them is in `metadata.py`; code that joins masters to preprocessed files on disk is in `build_volumes.py`.
+
+**Pipeline**:
+1. `python metadata.py <dataset> --input data/metadata/<DATASET>/ -o <dataset>_master.csv` — per-dataset harmonized master, 25-col SCHEMA (subject, scan, visit, age, sex, dx, mmse, cdr, moca, mds_updrs_iii, gds, scopa_aut, apoe, scanner, modality, ...).
+2. `python metadata.py concat --input data/metadata -o all_datasets_master.csv` — concatenate all masters.
+3. On Sherlock: `find data/preprocessed GBM_MAE/data/UPENN/normalize UCSF-PDGM-v3 -name '*.nii.gz' > files.txt`
+4. `python build_volumes.py --files files.txt --metadata-root data/metadata -o volumes.csv` — **one row per preprocessed .nii.gz**, joined with clinical.
+
+**`volumes.csv` is the training-ready file.** Columns: `file_path, dataset, subject_id, session_id, modality, scan_date, age_at_scan, sex, dx, dx_detail, site, mmse, cdr_global, moca, mds_updrs_iii, gds, scopa_aut, apoe, ...`.
+
+### Current volumes.csv state
+- **34,453 volume rows × 17,231 subjects × 20 datasets**
+- **Clinical dx match: 96.5%** (33,246 / 34,453)
+- Pretraining: use all 34,453 rows (every row has `file_path`). ControlNet: filter `df[df.dx.notna()]`.
+
+### Per-dataset coverage
+
+| Dataset | Rows | With-dx | Notes |
+|---------|-----:|--------:|-------|
+| ADNI | 10,910 | 100% | XML per-scan (CN/EMCI/LMCI/AD) + LONI longitudinal (MMSE/CDR/MoCA) |
+| PPMI | 3,908 | 100% | Per-subject baseline (cohort, UPDRS-III, MoCA, GDS, SCOPA-AUT, APOE + PD variants) |
+| NKI | 2,455 | 64% | 876 orphans need COINS DUA |
+| HCP-YA | 2,226 | 100% | BALSA Column Selector export (age bin, sex, MMSE) |
+| HBN | 2,135 | 99% | 4 per-site participants.tsv; rich instruments need HBN DUA |
+| UCSF | 1,980 | 100% | 4 structural × 495 subjects (bias-corrected only) |
+| BGSP | 1,636 | HC only | Dataverse CSV still pending |
+| ABIDE-II | 1,430 | 92% | Composite + 22 per-site |
+| FCON1000 | 1,197 | 97% | 33 per-site participants.tsv |
+| IXI | 1,159 | 97% | xls |
+| ABIDE-I | 984 | 100% | Composite + 19 per-site |
+| ADNI old | 815 | 100% | Pre-full download batch |
+| SCHIZO | 670 | 100% | COBRE+MCIC merged |
+| UPENN | 615 | 97% | cBioPortal + local clinical |
+| ADHD200 | 598 | 96% | Master TSV + 9 per-site |
+| CoRR | 546 | 83% | Aggregated phenotypic |
+| OASIS-1 | 436 | 100% | CDR + MMSE |
+| OASIS-2 | 373 | 100% | Longitudinal CDR |
+| NKI2 | 222 | 100% | Backfilled from NKI1 |
+| Stanford | 158 | 100% | Brain tumor cohort |
+
+### Gaps (not fixable without more downloads)
+- **NKI full phenotype** — 388 subjects need COINS DUA
+- **BGSP demographics** — waiting on Dataverse request
+- **HBN rich instruments** — need HBN DUA (WISC, CBCL, KSADS)
+- **BraTS 2023 clinical** — only Synapse image manifest, no clinical pulled
+
 ## Pipeline fixes — summary
 
 - OASIS-1: T88 → SRI24 re-registration
@@ -108,6 +155,6 @@ Target: SRI24 (240x240x155, 1mm iso, LPS, skull-stripped, raw intensity)
 
 | Status             | Volumes      |
 | ------------------ | ------------ |
-| Done               | ~45,863      |
+| Done               | ~45,048      |
 | Pending            | ~118,020+    |
-| **Projected**      | **~163,883+**|
+| **Projected**      | **~163,068+**|
