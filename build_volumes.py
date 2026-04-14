@@ -89,6 +89,25 @@ MODALITY_ALIASES = {
 }
 
 
+def _normalize_apoe(val) -> str | float:
+    """Normalize APOE genotype to standard E{n}/E{n} format.
+    ADNI stores as '34.0' (concatenated allele digits), PPMI as 'E3/E4'."""
+    if pd.isna(val):
+        return pd.NA
+    s = str(val).strip()
+    # Already in E_/E_ format
+    if s.startswith("E"):
+        return s
+    # Numeric format: '34.0' or '34' → 'E3/E4'
+    try:
+        digits = s.replace(".", "").replace("0", "")  # '34.0' → '34'
+        if len(digits) == 2 and digits.isdigit():
+            return f"E{digits[0]}/E{digits[1]}"
+    except (ValueError, IndexError):
+        pass
+    return pd.NA
+
+
 # =============================================================================
 # Per-dataset file parsers
 # Each returns {subject_key: <col>, value: <...>, session_id: ..., modality: ...}
@@ -498,6 +517,10 @@ def build_volumes(files_txt: Path, metadata_root: Path, output_csv: Path):
 
     # Collapse modality aliases (t1gd → t1c)
     df["modality"] = df["modality"].replace(MODALITY_ALIASES)
+
+    # Normalize APOE genotype format (ADNI '34.0' → 'E3/E4')
+    if "apoe" in df.columns:
+        df["apoe"] = df["apoe"].apply(_normalize_apoe)
 
     # Put the core columns first
     lead = ["file_path", "dataset", "subject_id", "session_id", "modality", "scan_date",
