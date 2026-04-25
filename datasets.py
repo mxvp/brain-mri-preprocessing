@@ -574,7 +574,10 @@ class TCGA(Dataset):
 
 
 class UCSF(Dataset):
-    """UCSF-PDGM — already registered to SRI24. Structural modalities with bias correction."""
+    """UCSF-PDGM v3 — bias-corrected, skull-stripped 240×240×155 LPS volumes
+    that ship in BraTS-style framing (brain pushed to top of canvas), so we
+    re-register to SRI24_SKULLSTRIPPED to bring the brain back to the canonical
+    placement used by every other dataset in the cohort. N4 is idempotent."""
 
     name = "ucsf"
     MODALITY_MAP = {
@@ -602,8 +605,9 @@ class UCSF(Dataset):
                 "subject_id": subject_id,
                 "center": center,
                 "moving": moving,
+                "pre_skull_stripped": True,
             })
-        log.info(f"UCSF: {len(results)} subjects (already in SRI24)")
+        log.info(f"UCSF: {len(results)} subjects")
         return results
 
 
@@ -767,9 +771,9 @@ REGISTRY: dict[str, type[Dataset]] = {
     "bgsp": BGSP,
     "fcon1000": FCON1000,
     "hcp": HCP,
-    # TCGA, UCSF, UPenn are already preprocessed in SRI24 — no pipeline needed.
-    # Classes kept below for reference / inventory if ever needed.
+    "ucsf": UCSF,
+    "upenn": UPenn,
+    # TCGA needs the same audit as UPENN/UCSF before re-enabling — the
+    # "already in SRI24" assumption was wrong for those two; verify TCGA too.
     # "tcga": TCGA,
-    # "ucsf": UCSF,
-    # "upenn": UPenn,
 }
