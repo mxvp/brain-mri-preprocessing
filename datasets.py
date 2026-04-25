@@ -612,7 +612,9 @@ class UCSF(Dataset):
 
 
 class UPenn(Dataset):
-    """UPenn-GBM — raw structural NIfTI: T1, T1GD, T2, FLAIR per subject."""
+    """UPenn-GBM — TCIA structural NIfTI: T1, T1GD, T2, FLAIR per subject.
+    Ships skull-stripped and BraTS-framed, so we re-register to SRI24_SKULLSTRIPPED
+    to match the canonical placement used by every other dataset in the cohort."""
 
     name = "upenn"
     MODALITY_SUFFIXES = {
@@ -639,6 +641,7 @@ class UPenn(Dataset):
                 "subject_id": f"UPenn_{subject_dir.name}",
                 "center": center,
                 "moving": moving,
+                "pre_skull_stripped": True,
             })
         log.info(f"UPenn: {len(results)} subjects")
         return results
