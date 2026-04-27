@@ -60,9 +60,8 @@ DATASET_MAP = {
     "hbn":       ("HBN/hbn_master.csv", "parse_hbn"),
     "nki":       ("NKI/nki_master.csv", "parse_nki"),
     "nki2":      ("NKI2/nki2_master.csv", "parse_nki2"),
-    # External paths (not under preprocessed/)
-    "normalize": ("UPENN/upenn_master.csv", "parse_upenn"),  # UPENN lives at .../UPENN/normalize
-    "UCSF-PDGM-v3": ("UCSF/ucsf_master.csv", "parse_ucsf"),
+    "upenn":     ("UPENN/upenn_master.csv", "parse_upenn"),
+    "ucsf":      ("UCSF/ucsf_master.csv", "parse_ucsf"),
 }
 
 
@@ -71,8 +70,6 @@ DATASET_MAP = {
 DATASET_CANONICAL_NAME = {
     "adni_full":    "adni",
     "hcp_ya":       "hcp_ya",
-    "normalize":    "upenn",
-    "UCSF-PDGM-v3": "ucsf",
 }
 
 
@@ -327,36 +324,30 @@ def parse_nki2(filename: str) -> dict | None:
 
 
 def parse_upenn(filename: str) -> dict | None:
-    """sub-UPENNGBM{NNNNN}_{ses-N}_{ce-GD}..._{mod}.nii.gz — brain-mri-preprocessing
-    UPENN files are NOT at preprocessed/... they're at GBM_MAE/data/UPENN/normalize/.
-    Filename pattern: sub-UPENNGBM00001_ses-6_ce-GD_run-1_T1w_n4_register_ss_normalize_t1.nii.gz
-    """
-    m = re.match(r"sub-UPENNGBM(\d+)_.*_(t1|t2|t1gd|t1c|flair)\.nii\.gz$", filename, re.IGNORECASE)
+    """UPenn_UPENN-GBM-{NNNNN}_{NN}_{modality}_preprocessed.nii.gz
+    Example: UPenn_UPENN-GBM-00001_11_t1_preprocessed.nii.gz"""
+    m = re.match(
+        r"UPenn_UPENN-GBM-(\d+)_(\d+)_(t1|t2|t1gd|t1c|flair)_preprocessed\.nii\.gz$",
+        filename, re.IGNORECASE,
+    )
     if not m:
-        # Fallback: grab modality from the end before .nii.gz
-        m2 = re.match(r"sub-UPENNGBM(\d+)_.*\.nii\.gz$", filename)
-        if not m2:
-            return None
-        num = m2.group(1)
-        return {"lookup_cols": {"subject_id": f"UPENN-GBM-{num}_11"},
-                "session_id": pd.NA, "modality": "unknown"}
-    num, mod = m.group(1), m.group(2).lower()
-    return {"lookup_cols": {"subject_id": f"UPENN-GBM-{num}_11"},
+        return None
+    num, sess, mod = m.group(1), m.group(2), m.group(3).lower()
+    return {"lookup_cols": {"subject_id": f"UPENN-GBM-{num}_{sess}"},
             "session_id": pd.NA, "modality": mod}
 
 
 def parse_ucsf(filename: str) -> dict | None:
-    """UCSF files at UCSF-PDGM-{NNNN}_nifti/UCSF-PDGM-{NNNN}_{T1|T1c|T2|FLAIR}_bias.nii.gz.
-    Files have 4-digit zero-padding (e.g. 0465); master has no padding (e.g. 465).
-    Skip DWI, DTI, ADC, segmentation, eddy, etc."""
-    m = re.match(r"UCSF-PDGM-(\d+)_(T1|T1c|T2|FLAIR)_bias\.nii\.gz$", filename)
+    """UCSF-PDGM-{NNNN}_{modality}_preprocessed.nii.gz
+    Example: UCSF-PDGM-0004_t1_preprocessed.nii.gz
+    Files have 4-digit zero-padding (e.g. 0465); master uses 3-digit (e.g. 465)."""
+    m = re.match(
+        r"UCSF-PDGM-(\d+)_(t1|t1c|t2|flair)_preprocessed\.nii\.gz$",
+        filename, re.IGNORECASE,
+    )
     if not m:
         return None
     num, mod = m.group(1), m.group(2).lower()
-    # Normalize to master format: strip leading zeros
-    master_sid = f"UCSF-PDGM-{int(num)}"
-    # But master zero-pads small numbers to 3 digits: UCSF-PDGM-004
-    # So: zfill(3) = "004", "465", etc.
     master_sid = f"UCSF-PDGM-{int(num):03d}"
     return {"lookup_cols": {"subject_id": master_sid}, "session_id": pd.NA, "modality": mod}
 
