@@ -43,7 +43,7 @@ DATASET_MAP = {
     # Preprocessed subdir name → (master CSV relative path, parser function name)
     # NOTE: adni_old deliberately excluded — it's superseded by adni_full and
     # the files would duplicate subjects with different naming.
-    "adni_full": ("ADNI/adni_master.csv", "parse_adni"),
+    "adni":      ("ADNI/adni_master.csv", "parse_adni"),
     "ppmi":      ("PPMI/ppmi_master.csv", "parse_ppmi"),
     "oasis1":    ("OASIS1/oasis1_master.csv", "parse_oasis1"),
     "oasis2":    ("OASIS2/oasis2_master.csv", "parse_oasis2"),
@@ -68,7 +68,6 @@ DATASET_MAP = {
 # Canonical dataset names (applied in output): rename parent-dir keys to
 # stable lowercase identifiers the downstream pipeline expects.
 DATASET_CANONICAL_NAME = {
-    "adni_full":    "adni",
     "hcp_ya":       "hcp_ya",
 }
 
