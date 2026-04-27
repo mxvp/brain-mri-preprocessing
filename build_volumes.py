@@ -323,16 +323,17 @@ def parse_nki2(filename: str) -> dict | None:
 
 
 def parse_upenn(filename: str) -> dict | None:
-    """UPenn_UPENN-GBM-{NNNNN}_{NN}_{modality}_preprocessed.nii.gz
-    Example: UPenn_UPENN-GBM-00001_11_t1_preprocessed.nii.gz"""
+    """UPenn_UPENN-GBM-{NNNNN}_11_{modality}_preprocessed.nii.gz — baseline only.
+    Post-op scans (_21) are excluded; resection cavities aren't representative
+    pathology for foundation pretraining."""
     m = re.match(
-        r"UPenn_UPENN-GBM-(\d+)_(\d+)_(t1|t2|t1gd|t1c|flair)_preprocessed\.nii\.gz$",
+        r"UPenn_UPENN-GBM-(\d+)_11_(t1|t2|t1gd|t1c|flair)_preprocessed\.nii\.gz$",
         filename, re.IGNORECASE,
     )
     if not m:
         return None
-    num, sess, mod = m.group(1), m.group(2), m.group(3).lower()
-    return {"lookup_cols": {"subject_id": f"UPENN-GBM-{num}_{sess}"},
+    num, mod = m.group(1), m.group(2).lower()
+    return {"lookup_cols": {"subject_id": f"UPENN-GBM-{num}_11"},
             "session_id": pd.NA, "modality": mod}
 
 
