@@ -12,7 +12,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
@@ -124,50 +126,77 @@ def _md5(path: Path, chunk: int = 1 << 16) -> str:
     return h.hexdigest()
 
 
+_thread_local = threading.local()
+
+
+def _session() -> requests.Session:
+    """Per-thread requests Session with a connection-pool adapter."""
+    s = getattr(_thread_local, "session", None)
+    if s is None:
+        s = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=4)
+        s.mount("https://", adapter)
+        _thread_local.session = s
+    return s
+
+
+def _download_one(row, dest, verify_md5, overwrite):
+    file_id = row["file_id"]
+    file_name = row["file_name"]
+    target_dir = dest / file_id
+    target = target_dir / file_name
+    md5_expected = row.get("md5sum")
+
+    if target.exists() and not overwrite:
+        if verify_md5 and pd.notna(md5_expected):
+            if _md5(target) == md5_expected:
+                return "skipped"
+            log.warning(f"md5 mismatch on {target.name}, re-downloading")
+        else:
+            return "skipped"
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_suffix(target.suffix + ".part")
+    sess = _session()
+    try:
+        r = sess.get(f"{GDC_DATA_URL}/{file_id}", stream=True, timeout=120)
+        r.raise_for_status()
+        with open(tmp, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1 << 16):
+                if chunk:
+                    f.write(chunk)
+        if not tmp.exists() or tmp.stat().st_size == 0:
+            raise RuntimeError(f"empty response for {file_id}")
+        if verify_md5 and pd.notna(md5_expected):
+            got = _md5(tmp)
+            if got != md5_expected:
+                tmp.unlink(missing_ok=True)
+                raise RuntimeError(f"md5 mismatch: expected {md5_expected}, got {got}")
+        tmp.replace(target)
+        return "downloaded"
+    except Exception as e:
+        log.error(f"failed {file_id} ({file_name}): {e}")
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
+        return "failed"
+
+
 def download_files(
     manifest: pd.DataFrame,
     dest: Path,
     verify_md5: bool = True,
     overwrite: bool = False,
-    session: requests.Session | None = None,
+    max_workers: int = 16,
+    progress_every: int = 50,
 ) -> dict[str, int]:
-    """Stream each manifest row into dest/{file_id}/{filename}. Idempotent."""
+    """Stream manifest rows into dest/{file_id}/{filename}. Idempotent, threaded."""
     dest.mkdir(parents=True, exist_ok=True)
-    sess = session or requests.Session()
     stats = {"downloaded": 0, "skipped": 0, "failed": 0}
-
-    for _, row in manifest.iterrows():
-        file_id = row["file_id"]
-        file_name = row["file_name"]
-        target_dir = dest / file_id
-        target = target_dir / file_name
-
-        if target.exists() and not overwrite:
-            if verify_md5 and pd.notna(row.get("md5sum")):
-                if _md5(target) == row["md5sum"]:
-                    stats["skipped"] += 1
-                    continue
-                log.warning(f"md5 mismatch on {target.name}, re-downloading")
-            else:
-                stats["skipped"] += 1
-                continue
-
-        target_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            r = sess.get(f"{GDC_DATA_URL}/{file_id}", stream=True, timeout=120)
-            r.raise_for_status()
-            tmp = target.with_suffix(target.suffix + ".part")
-            with open(tmp, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1 << 16):
-                    f.write(chunk)
-            if verify_md5 and pd.notna(row.get("md5sum")):
-                got = _md5(tmp)
-                if got != row["md5sum"]:
-                    tmp.unlink()
-                    raise RuntimeError(f"md5 mismatch: expected {row['md5sum']}, got {got}")
-            tmp.replace(target)
-            stats["downloaded"] += 1
-        except Exception as e:
-            log.error(f"failed {file_id} ({file_name}): {e}")
-            stats["failed"] += 1
+    rows = list(manifest.to_dict(orient="records"))
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = [pool.submit(_download_one, r, dest, verify_md5, overwrite) for r in rows]
+        for i, fut in enumerate(as_completed(futures), 1):
+            stats[fut.result()] += 1
+            if i % progress_every == 0 or i == len(futures):
+                log.info(f"  progress: {i}/{len(futures)}  {stats}")
     return stats

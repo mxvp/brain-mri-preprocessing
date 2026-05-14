@@ -89,7 +89,7 @@ def cmd_query(curate: dict) -> dict[str, Path]:
     return out
 
 
-def cmd_download(curate: dict) -> dict[str, dict[str, int]]:
+def cmd_download(curate: dict, max_workers: int = 16) -> dict[str, dict[str, int]]:
     """Download all manifest files into data/multimodal/raw_tsvs/<project>/."""
     cfg = cohorts_mod.load_cohorts_config()
     raw_root = _path(curate["paths"]["raw_tsv_root"])
@@ -108,8 +108,8 @@ def cmd_download(curate: dict) -> dict[str, dict[str, int]]:
             "id": "file_id", "filename": "file_name", "md5": "md5sum", "size": "file_size",
         })
         dest = raw_root / project
-        log.info(f"{key}: downloading {len(manifest)} files → {dest}")
-        s = gdc.download_files(manifest, dest)
+        log.info(f"{key}: downloading {len(manifest)} files → {dest} (workers={max_workers})")
+        s = gdc.download_files(manifest, dest, max_workers=max_workers)
         log.info(f"  {key}: {s}")
         stats[key] = s
     return stats
@@ -182,6 +182,8 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("command", choices=list(COMMANDS))
     p.add_argument("--curate-config", type=Path, default=None,
                    help="path to curate.yaml (default: configs/curate.yaml)")
+    p.add_argument("--workers", type=int, default=16,
+                   help="concurrent downloads for the `download` command (default: 16)")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
 
@@ -192,7 +194,16 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     curate = load_curate(args.curate_config)
-    COMMANDS[args.command](curate)
+    if args.command == "download":
+        cmd_download(curate, max_workers=args.workers)
+    elif args.command == "all":
+        cmd_inventory(curate)
+        cmd_query(curate)
+        cmd_download(curate, max_workers=args.workers)
+        cmd_matrix(curate)
+        cmd_pairs(curate)
+    else:
+        COMMANDS[args.command](curate)
 
 
 if __name__ == "__main__":
