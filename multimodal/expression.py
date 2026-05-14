@@ -97,9 +97,10 @@ def build_expression_matrix(
 
         for _, row in m.iterrows():
             tsv = Path(row["tsv_path"])
-            genes = parse_star_counts(tsv).set_index("gene_id_clean")
+            # Use full versioned gene_id as key — GENCODE PAR_Y entries share dotless IDs.
+            genes = parse_star_counts(tsv).set_index("gene_id")
             if gene_meta_ref is None:
-                gene_meta_ref = genes[["gene_id", "gene_name", "gene_type"]].copy()
+                gene_meta_ref = genes[["gene_name", "gene_type", "gene_id_clean"]].copy()
 
             sample_id = row["sample_submitter"] or row["file_id"]
             count_cols.append(genes["unstranded"].rename(sample_id))
@@ -126,7 +127,7 @@ def build_expression_matrix(
     return {
         "counts":      counts.astype(np.int32),
         "tpm":         tpm.astype(np.float32),
-        "gene_meta":   gene_meta_ref.reset_index().rename(columns={"gene_id_clean": "gene_id_short"}),
+        "gene_meta":   gene_meta_ref.reset_index().rename(columns={"gene_id_clean": "ensembl_short"}),
         "sample_meta": sample_meta,
     }
 
