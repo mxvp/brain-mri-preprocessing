@@ -58,4 +58,3 @@ A subject can contribute >1 sample (e.g. primary + recurrent). `pairs.csv` refle
 2. If the imaging parser isn't already in `multimodal/cohorts.py`, add one and register it in `PARSERS`.
 3. Run `python -m multimodal inventory query` to confirm IDs match the molecular repo.
 
-See `DESIGN.md` for the rationale behind these decisions.

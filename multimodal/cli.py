@@ -24,9 +24,7 @@ import yaml
 from . import REPO_ROOT, CONFIGS_DIR
 from . import cohorts as cohorts_mod
 from . import gdc
-from . import download as download_mod
-from . import matrix as matrix_mod
-from . import pairs as pairs_mod
+from . import expression as expr
 
 log = logging.getLogger("multimodal")
 
@@ -111,7 +109,7 @@ def cmd_download(curate: dict) -> dict[str, dict[str, int]]:
         })
         dest = raw_root / project
         log.info(f"{key}: downloading {len(manifest)} files → {dest}")
-        s = download_mod.download_files(manifest, dest)
+        s = gdc.download_files(manifest, dest)
         log.info(f"  {key}: {s}")
         stats[key] = s
     return stats
@@ -133,11 +131,11 @@ def cmd_matrix(curate: dict) -> Path:
             log.warning(f"{key}: no manifest at {full}, run `query` first")
             continue
         manifests[spec["expression"]["project_id"]] = pd.read_csv(full)
-    tables = matrix_mod.build_expression_matrix(
+    tables = expr.build_expression_matrix(
         manifests, raw_root, sample_filter=curate["samples"]
     )
-    matrix_mod.write_parquet(tables, out_root)
-    log.info(f"matrix tables: " + ", ".join(f"{k} {v.shape}" for k, v in tables.items()))
+    expr.write_parquet(tables, out_root)
+    log.info("matrix tables: " + ", ".join(f"{k} {v.shape}" for k, v in tables.items() if not v.empty))
     return out_root
 
 
@@ -149,10 +147,10 @@ def cmd_pairs(curate: dict) -> Path:
         raise FileNotFoundError(f"missing {sm_path} — run `matrix` first")
     sample_meta = pd.read_parquet(sm_path)
     inv = cohorts_mod.load_imaging_subjects()
-    pairs = pairs_mod.make_pairs(inv, sample_meta)
+    pairs = expr.make_pairs(inv, sample_meta)
     pairs_path = out_root / "pairs.csv"
     pairs.to_csv(pairs_path, index=False)
-    coverage = pairs_mod.coverage_summary(inv, pairs)
+    coverage = expr.coverage_summary(inv, pairs)
     coverage.to_csv(out_root / "coverage.csv", index=False)
     log.info(f"pairs → {pairs_path}")
     log.info("\n" + coverage.to_string(index=False))
