@@ -1,0 +1,51 @@
+# Curation pipeline parameters.
+#
+# These are the science decisions that govern how the final expression matrix
+# is built. Change here, re-run `python -m multimodal all`, and you get a new
+# matrix without touching code.
+
+# Which cohorts to include in the final matrix.
+include_cohorts:
+  - tcga_gbm
+  - tcga_lgg
+  - cptac_gbm
+
+# Sample-level handling.
+# Options:
+#   primary_only      → keep only "Primary Tumor" samples (1-to-1 with imaging)
+#   all_tumor         → keep primary + recurrent tumor samples
+#   all               → keep everything including normal/solid tissue
+samples: all_tumor
+
+# When a subject has >1 sample of the kept type, how to pick:
+#   first_by_id       → lexicographic on sample_submitter_id (deterministic)
+#   average           → mean across replicates (after normalization)
+#   keep_separate     → leave the duplicate rows in the output (multi-row per subject)
+duplicate_handling: keep_separate
+
+# Output representation. The matrix file stores raw counts and TPM
+# side-by-side. Downstream code can apply log1p / additional normalization
+# at load time.
+output:
+  values: counts_and_tpm    # counts_and_tpm | tpm_only | counts_only
+  log_transform: false      # store raw; apply log1p in loader
+  format: parquet           # parquet | hdf5
+
+# Gene filtering for the published matrix. The raw matrix keeps everything;
+# this is the "training-ready" filter.
+gene_filter:
+  gene_types: [protein_coding]   # subset of biotypes to keep
+  min_subjects_expressed: 10     # drop genes with non-zero TPM in <N subjects
+  min_tpm: 1.0                   # threshold for "expressed" in the above check
+
+# Quality flags (computed but not used to filter).
+qc:
+  flag_low_library_size: 5.0e6   # raw count sum
+  flag_low_protein_coding_fraction: 0.5
+
+# Source data locations (relative to repo root, or absolute).
+paths:
+  metadata_root: data/metadata
+  raw_tsv_root:  data/multimodal/raw_tsvs
+  manifest_root: data/multimodal/manifests
+  matrix_root:   data/multimodal/matrices

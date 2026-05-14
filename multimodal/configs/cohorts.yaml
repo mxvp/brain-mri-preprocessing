@@ -1,0 +1,71 @@
+# Canonical cohort definitions for the multimodal (MRI ↔ RNA-seq) pipeline.
+#
+# Each cohort declares:
+#   - imaging.source        where to find preprocessed imaging subject IDs
+#   - imaging.parser        which parser in cohorts.py extracts canonical subject IDs
+#   - expression.repo       where the RNA-seq lives (gdc | none)
+#   - expression.project    project_id in that repo
+#   - expression.has_public boolean; if false the cohort has no public transcriptome
+#
+# This file is the only place cohort identity rules live — code reads from it.
+
+cohorts:
+
+  tcga_gbm:
+    display_name: "TCGA-GBM"
+    imaging:
+      source: metadata
+      parser: tcga
+      metadata_csv: data/metadata/TCGA/tcga_master.csv
+      filter: {dx: GBM}
+    expression:
+      repo: gdc
+      project_id: TCGA-GBM
+      has_public: true
+
+  tcga_lgg:
+    display_name: "TCGA-LGG"
+    imaging:
+      source: metadata
+      parser: tcga
+      metadata_csv: data/metadata/TCGA/tcga_master.csv
+      filter: {dx: LGG}
+    expression:
+      repo: gdc
+      project_id: TCGA-LGG
+      has_public: true
+
+  cptac_gbm:
+    display_name: "CPTAC-GBM"
+    imaging:
+      source: directory
+      parser: cptac
+      # Local development directory; on Sherlock this will be the preprocessed path.
+      dir: <sanitized>/Documents/phd/projects/GBM/code/GBM_MAE/temp/cptac
+      glob: "sub-C3*_0000.nii.gz"
+    expression:
+      repo: gdc
+      project_id: CPTAC-3
+      has_public: true
+
+  upenn_gbm:
+    display_name: "UPENN-GBM"
+    imaging:
+      source: filelist
+      parser: upenn
+      filelist: data/metadata/files.txt
+    expression:
+      repo: none
+      has_public: false
+      note: "No public bulk RNA-seq. TCIA release has only IDH1+MGMT markers. Requires direct request to Bakas/Davatzikos lab."
+
+  ucsf_pdgm:
+    display_name: "UCSF-PDGM"
+    imaging:
+      source: filelist
+      parser: ucsf
+      filelist: data/metadata/files.txt
+    expression:
+      repo: none
+      has_public: false
+      note: "Public release contains only IDH/MGMT/1p19q markers."

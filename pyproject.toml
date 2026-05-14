@@ -14,6 +14,12 @@ prostate = [
     "pyyaml",
     "pydicom",
 ]
+multimodal = [
+    "pandas",
+    "requests",
+    "pyyaml",
+    "pyarrow",      # parquet I/O
+]
 dev = [
     "pytest",
 ]
