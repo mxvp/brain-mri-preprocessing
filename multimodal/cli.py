@@ -25,6 +25,7 @@ from . import REPO_ROOT, CONFIGS_DIR
 from . import cohorts as cohorts_mod
 from . import gdc
 from . import expression as expr
+from . import load as load_mod
 
 log = logging.getLogger("multimodal")
 
@@ -165,6 +166,30 @@ def cmd_all(curate: dict) -> None:
     cmd_pairs(curate)
 
 
+def cmd_verify(latents: Path) -> int:
+    """Run parse_latent_path over every path in a .pt; print + return exit code.
+
+    Exits nonzero if any path fails to parse — catches silent join failures
+    before they leak into downstream modeling.
+    """
+    if not latents:
+        log.error("verify requires --latents <path>")
+        return 2
+    report = load_mod.verify_latents(latents)
+    pct = 100.0 * report["matched"] / max(report["total"], 1)
+    print(f"latents:  {latents}")
+    print(f"total:    {report['total']}")
+    print(f"matched:  {report['matched']}  ({pct:.1f}%)")
+    print(f"per-cohort:   {report['per_cohort']}")
+    print(f"per-modality: {report['per_modality']}")
+    if report["unmatched"]:
+        print(f"\nUNMATCHED ({report['unmatched']}):")
+        for p in report["unmatched_examples"]:
+            print(f"  {p}")
+        return 1
+    return 0
+
+
 # ----- argparse glue -------------------------------------------------------
 
 COMMANDS = {
@@ -174,6 +199,7 @@ COMMANDS = {
     "matrix":    cmd_matrix,
     "pairs":     cmd_pairs,
     "all":       cmd_all,
+    "verify":    cmd_verify,
 }
 
 
@@ -184,6 +210,8 @@ def main(argv: list[str] | None = None) -> None:
                    help="path to curate.yaml (default: configs/curate.yaml)")
     p.add_argument("--workers", type=int, default=16,
                    help="concurrent downloads for the `download` command (default: 16)")
+    p.add_argument("--latents", type=Path, default=None,
+                   help="path to a .pt latents file (for the `verify` command)")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
 
@@ -192,6 +220,10 @@ def main(argv: list[str] | None = None) -> None:
         format="%(asctime)s  %(levelname)s  %(name)s  %(message)s",
         datefmt="%H:%M:%S",
     )
+
+    if args.command == "verify":
+        import sys
+        sys.exit(cmd_verify(args.latents))
 
     curate = load_curate(args.curate_config)
     if args.command == "download":
