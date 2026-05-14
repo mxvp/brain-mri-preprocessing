@@ -73,6 +73,14 @@ NEGATIVE_CASES = [
     "preprocessed/hbn/sub-NDARAU939WUK_t1_preprocessed.nii.gz",
     "preprocessed/ixi/IXI565-HH-2534_t1_preprocessed.nii.gz",
     "/random/path/no-cohort-id.nii.gz",
+
+    # TCGA IDs with a trailing vial-code letter (e.g. TCGAEZ7264A). These look
+    # plausible at a glance but the canonical participant ID is exactly 4 chars
+    # — the trailing letter is sample/vial info from a longer barcode. Reject
+    # rather than silently mis-parse as TCGA-EZ-7264 (which would join to the
+    # wrong subject if such an ID exists elsewhere).
+    "imagesTr/sub-TCGAEZ7264A_0000.nii.gz",
+    "imagesTr/sub-TCGAEZ7265A_0000.nii.gz",
 ]
 
 

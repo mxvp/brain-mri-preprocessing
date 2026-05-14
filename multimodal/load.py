@@ -175,7 +175,15 @@ def load_paired_dataset(
 
     # 1. Latents ------------------------------------------------------------
     blob = torch.load(latents_path, map_location="cpu", weights_only=False)
-    latents = blob["latents"]
+    if "features" in blob:
+        latents = blob["features"]
+    elif "latents" in blob:
+        latents = blob["latents"]
+    else:
+        raise KeyError(
+            f"{latents_path}: neither 'features' nor 'latents' key in blob. "
+            f"Keys present: {list(blob.keys())}"
+        )
     if latents.ndim == 3:           # (N, T, D) → mean-pool tokens
         latents = latents.mean(dim=1)
     latents = latents.numpy().astype(np.float32)
@@ -298,7 +306,9 @@ def verify_latents(latents_path: str | Path) -> dict:
                       unmatched_examples (first 5).
     """
     blob = torch.load(latents_path, map_location="cpu", weights_only=False)
-    paths = blob["file_paths"]
+    paths = blob.get("file_paths") or blob.get("paths")
+    if paths is None:
+        raise KeyError(f"{latents_path}: no 'file_paths' or 'paths' key.")
     parsed = [parse_latent_path(p) for p in paths]
     matched = [p for p, r in zip(paths, parsed) if r[0]]
     unmatched = [p for p, r in zip(paths, parsed) if not r[0]]
