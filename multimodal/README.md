@@ -46,6 +46,41 @@ Tunables live in `configs/curate.yaml`:
 - `gene_filter.gene_types`: which biotypes to keep
 - `gene_filter.min_subjects_expressed`, `min_tpm`: per-gene expression filter
 
+## Loading into a model
+
+Single function for downstream training:
+
+```python
+from multimodal.load import load_paired_dataset
+
+ds = load_paired_dataset(
+    "data/latents/your_encoder.pt",   # from GBM_MAE/scripts/encode_dataset.py
+    matrices_dir="data/multimodal/matrices",
+)
+
+ds.X            # (N, D)  imaging latents
+ds.y            # (N, G)  log1p(TPM) expression
+ds.subject_ids  # (N,)    canonical submitter IDs
+ds.cohort       # (N,)    TCGA-GBM / TCGA-LGG / CPTAC-3
+ds.split        # (N,)    'train' / 'val' / 'test'
+ds.gene_ids     # (G,)    versioned Ensembl IDs
+ds.gene_names   # (G,)    HGNC symbols
+ds.modality     # which imaging modality (default t1c)
+```
+
+Defaults that are baked in (kwargs override any of them):
+
+- one row per imaging **subject** (not sample, not modality)
+- modality `t1c`, fallback `t1`
+- sample type `Primary Tumor`
+- multi-sample subjects: TPM averaged
+- genes: protein-coding only, expressed (TPM ≥ 1) in ≥ 10 subjects (~17K genes)
+- target: `log1p(TPM)`
+- QC: drops samples with `protein_coding_fraction < 0.7`
+- split: subject-level, cohort-stratified, fixed seed 0
+
+The loader **assumes the latents file contains TCGA / CPTAC paths**. If it doesn't (e.g. you only have UPENN/UCSF latents), it returns an empty dataset with a warning — encode the tumor cohorts first via `scripts/encode_dataset.py` in GBM_MAE pointed at the preprocessed image dirs.
+
 ## Output format
 
 `counts.parquet` and `tpm.parquet` are sample × gene matrices (rows are samples, columns are dotless Ensembl IDs). `sample_meta.parquet` carries cohort, subject, sample type, and QC fields per row. `gene_meta.parquet` carries the gene annotation. `pairs.csv` is the join table — one row per (imaging_id, sample_id).

@@ -122,7 +122,13 @@ def build_expression_matrix(
     counts = pd.concat(count_cols, axis=1).T
     tpm = pd.concat(tpm_cols, axis=1).T
     counts.index.name = tpm.index.name = "sample_id"
-    sample_meta = pd.DataFrame(sample_rows).set_index("sample_id")
+    # A single GDC file can map to multiple manifest rows (same expression file
+    # linked to >1 sample submitter). Dedupe rows so each sample_id is unique.
+    counts = counts[~counts.index.duplicated(keep="first")]
+    tpm    = tpm[~tpm.index.duplicated(keep="first")]
+    sample_meta = (pd.DataFrame(sample_rows)
+                     .drop_duplicates("sample_id", keep="first")
+                     .set_index("sample_id"))
 
     return {
         "counts":      counts.astype(np.int32),
