@@ -7,3 +7,13 @@ dependencies = [
     "nibabel",
     "numpy",
 ]
+
+[project.optional-dependencies]
+prostate = [
+    "SimpleITK",
+    "pyyaml",
+    "pydicom",
+]
+dev = [
+    "pytest",
+]
