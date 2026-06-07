@@ -32,11 +32,34 @@ Outputs land in `data/prostate/preprocessed/<patient_id>.nii.gz`.
 `configs/preprocess.yaml::segmentation.backend` is `stub` by default — uses a 50%-of-FOV center box as the prostate mask. **Do not train on this.** It exists so the pipeline runs end-to-end without the 1.5 GB Radboud nnU-Net checkpoint.
 
 To switch to the real segmenter:
-1. Grab the checkpoint from <https://github.com/DIAGNijmegen/AbdomenMRUS-prostate-segmentation>
-2. Set `segmentation.backend: nnunet` + `segmentation.nnunet_checkpoint: <path>`
-3. Implement the actual nnU-Net call inside `segment._nnunet_mask` (interface documented in the docstring)
+
+```bash
+uv pip install nnunetv2 torch                       # local
+# on Sherlock: it's already in the `brain` conda env
+
+# fetch the model files (one-time, into $GROUP_SCRATCH/$USER/models/...)
+bash prostate/slurm/fetch_radboud_model.sh
+```
+
+Then either edit `configs/preprocess.yaml` to set `segmentation.backend: nnunet` and `nnunet_checkpoint: <path>`, or run with the SLURM script below — it materializes a runtime config with those values.
 
 The PI-CAI paper reports Dice ≈ 0.96 internal / 0.82 external for that model. TotalSegmentator's prostate channel is Dice ≈ 0.15 (under-segments badly) — don't use it.
+
+## Run on Sherlock
+
+```bash
+# one-time: get the model weights into $GROUP_SCRATCH/$USER/models/
+bash prostate/slurm/fetch_radboud_model.sh
+
+# submit the preprocessing job (1 GPU, 16 CPU, 64 GB, 3 h)
+sbatch prostate/slurm/preprocess.sh
+
+# watch
+squeue -u $USER
+tail -f prostate/slurm/logs/preprocess_<jobid>.out
+```
+
+Expected runtime on 1 GPU: ~1–1.5 h for 732 patients. Outputs land in `$GROUP_SCRATCH/$USER/prostate/preprocessed/<patient_id>.nii.gz`.
 
 ## Adding a cohort
 
