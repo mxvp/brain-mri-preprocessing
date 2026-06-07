@@ -1,7 +1,5 @@
-# Per-patient preprocessing parameters. Change here, re-run, get a new product.
+# Paths + series classification. That's it — no preprocessing.
 
-# Where the dcm2niix output lives. Patient files are flat in this directory
-# with names like `Prostate-MRI-US-Biopsy-0001_<SeriesDescription>_<num>.nii.gz`.
 paths:
   nifti_root: data/Prostate-MRI-US-Biopsy-NBIA-manifest_v2_20231020/nifti
   output_root: data/prostate/preprocessed
@@ -11,46 +9,10 @@ paths:
 series:
   t2:    ['t2.*prostate', 't2_spc', 'ax_t2', 't2_tra']
   adc:   ['adc']
-  dwi:   ['calc_bval', 'high_b', 'tracew', 'b\\d{3,4}\\b']   # high-b DWI
+  dwi:   ['calc_bval', 'high_b', 'tracew', 'b\\d{3,4}\\b']
 
-# Pipeline parameters
-n4:
-  shrink_factor: 4
-  n_iterations: [50, 50, 50, 50]
-  apply_to: [t2, adc]                # DWI usually not bias-corrected separately
-
-registration:
-  type: rigid                        # SimpleITK rigid; mutual info metric
-  reference: t2                      # DWI/ADC → T2w
-  interpolator: linear
-
-# Prostate gland segmentation. The PI-CAI standard is the Radboud nnU-Net
-# checkpoint (DIAGNijmegen/AbdomenMRUS-prostate-segmentation). Until you
-# point this at a real checkpoint, segment.py falls back to a fixed-center
-# bbox so the rest of the pipeline runs end-to-end.
-segmentation:
-  backend: stub                      # stub | nnunet
-  nnunet_checkpoint: null
-  # When backend == stub: half the FOV centered on the image center.
-  stub_box_fraction: 0.5
-
-# Crop around the prostate mask
-crop:
-  margin_mm: [20, 20, 6]             # x, y, z margins around the gland bbox
-
-# Resample target. PI-CAI default; preserves slice anisotropy.
-resample:
-  voxel_spacing: [0.5, 0.5, 3.0]     # mm
-  # If a modality is already at target spacing, skip resample.
-
-# Per-modality normalization
-normalize:
-  t2:  {method: zscore_nonzero}
-  dwi: {method: zscore_nonzero}
-  adc: {method: clip_then_zscore, clip_low: 0.5, clip_high: 99.5}   # percentiles
-
-# Output: how to stack into the final volume
+# Output: one symlink (or copy) per (patient, modality). Flat dir.
 output:
-  channels: [t2, dwi, adc, mask]     # 4-channel; mask is the prostate gland
-  dtype: float32
-  format: nifti                      # nifti | npz
+  modalities: [t2, adc, dwi]
+  filename_template: "{patient_id}_{modality}.nii.gz"
+  copy: false                # true → real copies (~7 GB); false → symlinks

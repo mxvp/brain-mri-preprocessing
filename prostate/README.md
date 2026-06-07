@@ -1,80 +1,56 @@
 # prostate
 
-Per-patient preprocessing for multiparametric prostate MRI, following the PI-CAI / Radboud nnU-Net community baseline.
+Organize multiparametric prostate MRI for VAE training. No preprocessing.
 
-Pipeline (per patient, in order):
+For VAE generative pretraining the raw dcm2niix output is enough — the VAE loader handles resize and normalization at load time, and bias-field / intensity quirks are part of the data variability the model should learn. So this module just:
 
-1. **N4 bias correction** on T2w (and ADC)
-2. **Prostate gland segmentation** on T2w (stub box for now → swap in Radboud nnU-Net later)
-3. **Rigid registration** of ADC + DWI to T2w (SimpleITK Mattes MI)
-4. **Crop** around the gland bbox + margin
-5. **Resample** all volumes to a common voxel spacing (PI-CAI default: 0.5 × 0.5 × 3.0 mm)
-6. **Per-modality normalization** (T2/DWI: z-score over nonzero voxels; ADC: clip 0.5–99.5 percentile then z-score)
-7. **Stack as 4 channels**: `[T2w, DWI, ADC, mask]` → one NIfTI per patient
+1. Groups the flat dcm2niix output into per-patient T2 / ADC / DWI records (regex on `SeriesDescription` from each `.json` sidecar)
+2. Picks the best acquisition per modality (most slices wins; one T2, one ADC, one DWI per patient)
+3. Materializes them as symlinks (or copies) into a flat dir the VAE loader can glob
 
-Tuned via `configs/preprocess.yaml`. All steps idempotent — re-runs skip existing outputs.
+```
+data/prostate/preprocessed/
+  Prostate-MRI-US-Biopsy-0001_t2.nii.gz   -> ../../.../nifti/Prostate-MRI-US-Biopsy-0001_..._t2_spc_..._11.nii.gz
+  Prostate-MRI-US-Biopsy-0001_adc.nii.gz  -> ../../.../nifti/Prostate-MRI-US-Biopsy-0001_..._ADC_..._5.nii.gz
+  Prostate-MRI-US-Biopsy-0001_dwi.nii.gz  -> ../../.../nifti/Prostate-MRI-US-Biopsy-0001_..._CALC_BVAL_..._7.nii.gz
+  ...
+```
 
 ## Run
 
 ```bash
-# What's in our dcm2niix output? Counts T2/ADC/DWI per patient.
+# what's in the dcm2niix output? counts T2/ADC/DWI per patient
 python -m prostate inventory
 
-# Full pipeline for every complete patient. Use --limit N for smoke tests.
-python -m prostate preprocess --limit 5
-python -m prostate preprocess
+# materialize the VAE-loadable flat dir (symlinks; ~5 sec for 732 patients)
+python -m prostate organize
+
+# or self-contained copies (~7 GB on disk, slower)
+python -m prostate organize  # then edit configs/preprocess.yaml: output.copy: true
 ```
 
-Outputs land in `data/prostate/preprocessed/<patient_id>.nii.gz`.
+## Wiring into the VAE
 
-## Stub vs real prostate segmentation
+The flat dir is a `type: simple` dataset entry. In `VAE/configs/vae.yaml`:
 
-`configs/preprocess.yaml::segmentation.backend` is `stub` by default — uses a 50%-of-FOV center box as the prostate mask. **Do not train on this.** It exists so the pipeline runs end-to-end without the 1.5 GB Radboud nnU-Net checkpoint.
-
-To switch to the real segmenter:
-
-```bash
-uv pip install nnunetv2 torch                       # local
-# on Sherlock: it's already in the `brain` conda env
-
-# fetch the model files (one-time, into $GROUP_SCRATCH/$USER/models/...)
-bash prostate/slurm/fetch_radboud_model.sh
+```yaml
+datasets: [..., prostate_t2, prostate_adc, prostate_dwi]
+dataset_paths:
+  prostate_t2:  {type: simple, img_dir: /oak/.../brain-mri-preprocessing/data/prostate/preprocessed_t2}
+  prostate_adc: {type: simple, img_dir: /oak/.../brain-mri-preprocessing/data/prostate/preprocessed_adc}
+  prostate_dwi: {type: simple, img_dir: /oak/.../brain-mri-preprocessing/data/prostate/preprocessed_dwi}
 ```
 
-Then either edit `configs/preprocess.yaml` to set `segmentation.backend: nnunet` and `nnunet_checkpoint: <path>`, or run with the SLURM script below — it materializes a runtime config with those values.
+(If you want per-modality dirs instead of flat-with-prefix, change `output_root` in the config to point at three different dirs and run `organize` three times — or just route by suffix at load time.)
 
-The PI-CAI paper reports Dice ≈ 0.96 internal / 0.82 external for that model. TotalSegmentator's prostate channel is Dice ≈ 0.15 (under-segments badly) — don't use it.
+## What this dataset has
 
-## Run on Sherlock
-
-```bash
-# one-time: get the model weights into $GROUP_SCRATCH/$USER/models/
-bash prostate/slurm/fetch_radboud_model.sh
-
-# submit the preprocessing job (1 GPU, 16 CPU, 64 GB, 3 h)
-sbatch prostate/slurm/preprocess.sh
-
-# watch
-squeue -u $USER
-tail -f prostate/slurm/logs/preprocess_<jobid>.out
-```
-
-Expected runtime on 1 GPU: ~1–1.5 h for 732 patients. Outputs land in `$GROUP_SCRATCH/$USER/prostate/preprocessed/<patient_id>.nii.gz`.
-
-## Adding a cohort
-
-Adding e.g. PI-CAI / PROSTATEx:
-1. Run dcm2niix into a flat output dir
-2. Point `paths.nifti_root` at it
-3. If the SeriesDescription patterns differ, extend `series:` in `preprocess.yaml`
+The TCIA Prostate-MRI-US-Biopsy collection is a **biopsy-confirmed prostate-cancer cohort**, not healthy prostates. Beyond imaging it has Gleason scores per biopsy core, PI-RADS-like Likert scores per lesion, PSA, and prostate volume measurements (separate `.xlsx` files on TCIA, not included here). Useful later if you want to condition the DiT on cancer grade / risk.
 
 ## Files
 
-- `patients.py` — discover dcm2niix output, classify by `SeriesDescription`, build per-patient records
-- `segment.py` — prostate gland mask (stub / nnU-Net)
-- `registration.py` — rigid SimpleITK DWI/ADC → T2w
-- `normalize.py` — per-modality intensity normalization
-- `preprocess.py` — the per-patient pipeline orchestrator
+- `patients.py` — discover dcm2niix output, classify by `SeriesDescription`, pick best per modality
+- `organize.py` — materialize the VAE-loadable layout (symlinks or copies)
 - `cli.py` + `__main__.py` — `python -m prostate <command>`
-- `configs/preprocess.yaml` — all science knobs
+- `configs/preprocess.yaml` — paths + series regex + output naming
 - `tests/` — unit tests
