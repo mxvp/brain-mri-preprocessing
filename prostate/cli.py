@@ -51,27 +51,36 @@ def cmd_organize(cfg: dict, limit: int | None = None) -> None:
     copy = bool(cfg["output"].get("copy", False))
 
     records = patients_mod.load_patients(nifti_root, cfg["series"])
-    complete = [r for r in records.values() if r.is_complete()]
-    log.info(f"Organizing {len(complete)} complete patients → {output_root}  "
+    # Include any patient with at least one of the target modalities — drop
+    # only the truly empty records.
+    eligible = [r for r in records.values()
+                if any(getattr(r, m, None) is not None for m in modalities)]
+    log.info(f"Organizing {len(eligible)} patients (of {len(records)} total) → {output_root}  "
              f"({'copy' if copy else 'symlink'})")
     if limit:
-        complete = complete[:limit]
+        eligible = eligible[:limit]
         log.info(f"  (limit={limit})")
 
-    n_ok = n_skip = n_fail = 0
-    for i, rec in enumerate(complete, 1):
+    n_ok = n_files = n_fail = 0
+    per_modality = {m: 0 for m in modalities}
+    for i, rec in enumerate(eligible, 1):
         try:
             out = organize_mod.organize_patient(rec, output_root, modalities, template, copy=copy)
-            if out is None:
-                n_skip += 1
-            else:
-                n_ok += 1
+            n_ok += 1
+            n_files += len(out)
+            for p in out:
+                for m in modalities:
+                    if p.name.endswith(f"_{m}.nii.gz"):
+                        per_modality[m] += 1
+                        break
         except Exception:
             log.exception(f"{rec.patient_id}: failed")
             n_fail += 1
-        if i % 50 == 0 or i == len(complete):
-            log.info(f"  progress: {i}/{len(complete)}  ok={n_ok} skip={n_skip} fail={n_fail}")
-    log.info(f"done: ok={n_ok}  skip={n_skip}  fail={n_fail}")
+        if i % 50 == 0 or i == len(eligible):
+            log.info(f"  progress: {i}/{len(eligible)}  patients_ok={n_ok} fail={n_fail} files={n_files}")
+    log.info(f"done: {n_ok} patients, {n_files} files, {n_fail} failed")
+    for m, c in per_modality.items():
+        log.info(f"  {m}: {c} files")
     log.info(f"output dir: {output_root}")
 
 

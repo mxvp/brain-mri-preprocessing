@@ -34,18 +34,19 @@ def organize_patient(
     modalities: list[str],
     template: str,
     copy: bool = False,
-) -> list[Path] | None:
-    """Materialize the patient's modality files in `output_dir`. Idempotent."""
-    if not record.is_complete():
-        log.warning(f"{record.patient_id}: missing {record.missing()}, skipping")
-        return None
+) -> list[Path]:
+    """Materialize whichever modality files this patient has in `output_dir`.
 
+    Patients with only some of `modalities` are still processed — each present
+    modality produces a link/copy; missing ones are silently skipped. Returns
+    an empty list for patients with none of the requested modalities.
+    Idempotent.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     written = []
     for mod in modalities:
         src = getattr(record, mod, None)
         if src is None:
-            log.warning(f"{record.patient_id}: no {mod}, skipping that file")
             continue
         dst = output_dir / template.format(patient_id=record.patient_id, modality=mod)
         if dst.exists() or dst.is_symlink():
