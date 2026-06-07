@@ -119,13 +119,15 @@ def preprocess_patient(record: PatientRecord, cfg: dict, output_dir: Path) -> Pa
                                           cfg["registration"]["interpolator"])
 
     # 4. Crop around the prostate mask + margin
+    # mask_arr is in SimpleITK array order (z, y, x); spacing is image order (x, y, z).
     margin_mm = np.array(cfg["crop"]["margin_mm"], dtype=float)
-    spacing = np.array(t2_n4.GetSpacing())            # (x, y, z)
-    margin_vox = (margin_mm / spacing).round().astype(int).tolist()
-    bbox = _expand_bbox(_bbox_from_mask(mask_arr.transpose(2, 1, 0)),
-                        margin_vox[::-1], mask_arr.shape)
-    # SimpleITK uses (z, y, x) ordering for arrays; convert bbox to ITK index/size
-    z_slc, y_slc, x_slc = bbox
+    spacing_xyz = np.array(t2_n4.GetSpacing())
+    margin_vox_xyz = (margin_mm / spacing_xyz).round().astype(int)
+    bbox_zyx = _expand_bbox(_bbox_from_mask(mask_arr),
+                            margin_vox_xyz[::-1].tolist(),
+                            mask_arr.shape)
+    # ITK index/size are in image order (x, y, z); slices above are (z, y, x).
+    z_slc, y_slc, x_slc = bbox_zyx
     crop_index = [int(x_slc.start), int(y_slc.start), int(z_slc.start)]
     crop_size  = [int(x_slc.stop - x_slc.start),
                   int(y_slc.stop - y_slc.start),
@@ -149,15 +151,17 @@ def preprocess_patient(record: PatientRecord, cfg: dict, output_dir: Path) -> Pa
     dwi_arr = norm.apply(to_arr(dwi_r), cfg["normalize"]["dwi"])
     mask_arr_r = to_arr(mask_r).astype(np.float32)
 
-    # 7. Save as 4-channel NIfTI ordered [t2, dwi, adc, mask] along the 4th axis
+    # 7. Save as 4-channel NIfTI ordered [t2, dwi, adc, mask] along the 4th axis.
+    # The per-modality arrays above are SimpleITK-order (z, y, x); nibabel
+    # expects (x, y, z, c). Stack on the channel axis first, then reorder.
     channels = cfg["output"]["channels"]
     arrs = {"t2": t2_arr, "dwi": dwi_arr, "adc": adc_arr, "mask": mask_arr_r}
-    stack = np.stack([arrs[c] for c in channels], axis=-1).astype(np.float32)
-    # nibabel expects (x, y, z, c); SimpleITK arrays are (z, y, x) so reorder
-    stack = np.moveaxis(stack, [0, 1, 2], [2, 1, 0])
+    stack_zyxc = np.stack([arrs[c] for c in channels], axis=-1).astype(np.float32)
+    stack = np.transpose(stack_zyxc, (2, 1, 0, 3))   # (x, y, z, c)
 
     affine = np.eye(4)
-    affine[:3, :3] = np.diag(sp + [1])[:3, :3]
+    for i, s in enumerate(sp):
+        affine[i, i] = s
     out_img = nib.Nifti1Image(stack, affine)
     out_img.header.set_xyzt_units("mm", "sec")
     nib.save(out_img, out_path)

@@ -55,14 +55,16 @@ def cmd_preprocess(cfg: dict, limit: int | None = None) -> None:
     for i, rec in enumerate(complete, 1):
         try:
             out = preprocess_mod.preprocess_patient(rec, cfg, output_root)
-            (n_ok if out and (output_root / f"{rec.patient_id}.nii.gz").exists() else n_skip).__add__(0)
-            n_ok += 1 if out else 0
+            if out is None:
+                n_skip += 1
+            else:
+                n_ok += 1
         except Exception:
             log.exception(f"{rec.patient_id}: failed")
             n_fail += 1
         if i % 10 == 0 or i == len(complete):
-            log.info(f"  progress: {i}/{len(complete)}  ok={n_ok} fail={n_fail}")
-    log.info(f"done: ok={n_ok}  fail={n_fail}")
+            log.info(f"  progress: {i}/{len(complete)}  ok={n_ok} skip={n_skip} fail={n_fail}")
+    log.info(f"done: ok={n_ok}  skip={n_skip}  fail={n_fail}")
 
 
 def main(argv=None) -> None:

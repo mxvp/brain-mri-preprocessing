@@ -34,15 +34,23 @@ def _stub_mask(shape: tuple[int, int, int], fraction: float) -> np.ndarray:
 
 
 def segment_prostate(t2_path: Path, cfg: dict) -> np.ndarray:
-    """Run the configured backend and return a 3D uint8 mask in T2 voxel space."""
+    """Return a 3D uint8 mask matching T2 in **SimpleITK array order (z, y, x)**.
+
+    Returning in SimpleITK convention keeps downstream consumers (registration,
+    crop, resample) uniform — all the heavy lifting in preprocess.py uses
+    SimpleITK images, where `GetArrayFromImage` gives (z, y, x).
+    """
     backend = cfg["segmentation"]["backend"]
-    import nibabel as nib
-    t2 = nib.load(t2_path)
+    import SimpleITK as sitk
+    t2 = sitk.ReadImage(str(t2_path))
+    size_xyz = t2.GetSize()                 # SimpleITK image size is (x, y, z)
+    arr_shape_zyx = (size_xyz[2], size_xyz[1], size_xyz[0])
+
     if backend == "stub":
         frac = float(cfg["segmentation"].get("stub_box_fraction", 0.5))
         log.warning(f"Using STUB prostate mask ({frac*100:.0f}% center box). "
                     f"Replace with the Radboud nnU-Net checkpoint before training.")
-        return _stub_mask(t2.shape, frac)
+        return _stub_mask(arr_shape_zyx, frac)
     if backend == "nnunet":
         return _nnunet_mask(t2_path, cfg)
     raise ValueError(f"Unknown segmentation backend: {backend!r}")
