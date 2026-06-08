@@ -104,6 +104,20 @@ def run(
     log.info(f"target spacing: {spacing_xyz}   matrix: {matrix_size_xyz}")
     log.info(f"output root:    {preprocessed_root}")
 
+    # Drop wide-FOV rows: naive geometric center crop assumes the prostate
+    # is at the image center, which holds for prostate-focused acquisitions
+    # but NOT for body-coil whole-pelvis scans (the prostate sits low-
+    # posterior in the body, off-center in the image). These rows are flagged
+    # `wide_fov=True` by qc.py — only set for T2 modality where the bias is
+    # severe (~350 mm native FOV).
+    if "wide_fov" in in_manifest.columns:
+        n_wide = int(in_manifest["wide_fov"].fillna(False).astype(bool).sum())
+        if n_wide > 0:
+            log.info(f"dropping {n_wide} rows flagged wide_fov "
+                     f"(prostate off-center → center crop misses it)")
+            in_manifest = in_manifest[~in_manifest["wide_fov"].fillna(False).astype(bool)].reset_index(drop=True)
+            log.info(f"  remaining: {len(in_manifest)} rows to preprocess")
+
     preprocessed_root.mkdir(parents=True, exist_ok=True)
     ok = fail = 0
     failures: list[dict] = []
