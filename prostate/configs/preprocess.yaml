@@ -1,18 +1,30 @@
-# Paths + series classification. That's it — no preprocessing.
+# All paths can be absolute or repo-relative (resolved against the repo root).
 
 paths:
-  nifti_root: data/Prostate-MRI-US-Biopsy-NBIA-manifest_v2_20231020/nifti
   output_root: data/prostate/preprocessed
 
-# Series classification — regex matched (case-insensitive) on SeriesDescription
-# read from the dcm2niix JSON sidecar. First match wins.
-series:
-  t2:    ['t2.*prostate', 't2_spc', 'ax_t2', 't2_tra']
-  adc:   ['adc']
-  dwi:   ['calc_bval', 'high_b', 'tracew', 'b\\d{3,4}\\b']
+workers: 8                # parallel SimpleITK conversions
 
-# Output: one symlink (or copy) per (patient, modality). Flat dir.
-output:
-  modalities: [t2, adc, dwi]
-  filename_template: "{patient_id}_{modality}.nii.gz"
-  copy: false                # true → real copies (~7 GB); false → symlinks
+sources:
+  picai:
+    enabled: true
+    root: <sanitized>/Documents/phd/projects/prostate-dt/data/picai/images
+    min_slices: 5
+  tcia_biopsy:
+    enabled: true
+    root: <sanitized>/Documents/phd/projects/prostate-dt/data/Prostate-MRI-US-Biopsy-NBIA-manifest_v2_20231020/nifti
+    min_slices: 5
+  prostate158:
+    enabled: true
+    root: <sanitized>/Documents/phd/projects/prostate-dt/data/prostate158
+    min_slices: 5
+  promise12:
+    enabled: true
+    root: <sanitized>/Documents/phd/projects/prostate-dt/data/promise12
+    min_slices: 5
+
+# Patient-grouped, source-stratified train/val split.
+# A patient's volumes always land in the same split — no leakage.
+split:
+  val_fraction: 0.05
+  seed: 0
