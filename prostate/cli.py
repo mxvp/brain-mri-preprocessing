@@ -17,6 +17,8 @@ import yaml
 
 from . import REPO_ROOT, CONFIGS_DIR
 from . import organize as organize_mod
+from . import preprocess as preprocess_mod
+from . import qc as qc_mod
 from . import sources as sources_mod
 
 log = logging.getLogger("prostate")
@@ -50,13 +52,44 @@ def cmd_organize(cfg: dict, limit_per_source: int | None) -> None:
     organize_mod.organize_all(cfg, limit_per_source=limit_per_source)
 
 
+def cmd_qc(cfg: dict, no_canonicalize: bool) -> None:
+    output_root = Path(cfg["paths"]["output_root"]).expanduser().resolve()
+    qc_cfg = cfg.get("qc", {})
+    qc_mod.run(
+        output_root=output_root,
+        target_orientation=qc_cfg.get("target_orientation", "LPS"),
+        canonicalize=not no_canonicalize,
+        max_workers=int(cfg.get("workers", 8)),
+    )
+
+
+def cmd_preprocess(cfg: dict) -> None:
+    organized_root = Path(cfg["paths"]["output_root"]).expanduser().resolve()
+    pp_cfg = cfg.get("preprocess", {})
+    pp_root = Path(pp_cfg.get(
+        "output_root",
+        str(organized_root.parent / (organized_root.name + "_preprocessed"))
+    )).expanduser().resolve()
+    spacing = tuple(pp_cfg.get("spacing", [0.5, 0.5, 3.0]))
+    matrix  = tuple(pp_cfg.get("matrix_size", [160, 160, 20]))
+    preprocess_mod.run(
+        organized_root=organized_root,
+        preprocessed_root=pp_root,
+        spacing_xyz=spacing,
+        matrix_size_xyz=matrix,
+        max_workers=int(cfg.get("workers", 8)),
+    )
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="python -m prostate")
-    p.add_argument("command", choices=["discover", "organize"])
+    p.add_argument("command", choices=["discover", "organize", "qc", "preprocess"])
     p.add_argument("--config", type=Path, default=None,
                    help="path to preprocess.yaml (default: configs/preprocess.yaml)")
     p.add_argument("--limit-per-source", type=int, default=None,
                    help="cap each source to N records (smoke testing)")
+    p.add_argument("--no-canonicalize", action="store_true",
+                   help="qc: skip the orientation rewrite, only add manifest columns")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
 
@@ -69,8 +102,12 @@ def main(argv=None) -> None:
     cfg = _load_cfg(args.config)
     if args.command == "discover":
         cmd_discover(cfg)
-    else:
+    elif args.command == "organize":
         cmd_organize(cfg, args.limit_per_source)
+    elif args.command == "qc":
+        cmd_qc(cfg, args.no_canonicalize)
+    else:  # preprocess
+        cmd_preprocess(cfg)
 
 
 if __name__ == "__main__":

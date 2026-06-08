@@ -28,3 +28,16 @@ sources:
 split:
   val_fraction: 0.05
   seed: 0
+
+# Post-organize QC + orientation canonicalization. Run via `python -m prostate qc`.
+qc:
+  target_orientation: LPS         # rewrite any non-LPS files to LPS
+
+# Canonical PI-CAI preprocessing — resample to uniform voxel grid, then
+# center-crop to a fixed prostate-centered matrix. Eliminates per-center FOV
+# variance (wide vs narrow native acquisitions all end up at 80×80×60 mm
+# physical). Defaults match picai_prep's published config.
+preprocess:
+  output_root: data/prostate/preprocessed_canonical
+  spacing:     [0.5, 0.5, 3.0]    # mm  (x, y, z)
+  matrix_size: [160, 160, 20]     # voxels  (x, y, z) = 80×80×60 mm
