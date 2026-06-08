@@ -16,19 +16,20 @@ def materialize_nifti(
     src_path: Path,
     src_format: str,
     dst_path: Path,
-    symlink_if_already_nifti: bool = True,
+    use_symlinks: bool = False,
 ) -> None:
-    """Make sure `dst_path` is a NIfTI on disk pointing at the same data.
+    """Make sure `dst_path` is a real NIfTI file on disk.
 
-    Behavior by source format:
-      'nii.gz' → symlink dst → src (no disk duplication)
-      'mha' or 'mhd' → SimpleITK roundtrip; new .nii.gz at dst
+    Default behavior is a real copy (or SimpleITK roundtrip), so the output
+    directory is portable — you can rsync it to another machine without the
+    targets going stale. Pass `use_symlinks=True` to symlink already-NIfTI
+    sources for a transient / local-only run.
     """
     if dst_path.exists() or dst_path.is_symlink():
         return
     dst_path.parent.mkdir(parents=True, exist_ok=True)
     if src_format == "nii.gz":
-        if symlink_if_already_nifti:
+        if use_symlinks:
             dst_path.symlink_to(src_path.resolve())
         else:
             import shutil
