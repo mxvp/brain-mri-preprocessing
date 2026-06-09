@@ -72,12 +72,14 @@ def cmd_preprocess(cfg: dict) -> None:
     )).expanduser().resolve()
     spacing = tuple(pp_cfg.get("spacing", [0.5, 0.5, 3.0]))
     matrix  = tuple(pp_cfg.get("matrix_size", [160, 160, 20]))
+    filters = pp_cfg.get("filters", {})
     preprocess_mod.run(
         organized_root=organized_root,
         preprocessed_root=pp_root,
         spacing_xyz=spacing,
         matrix_size_xyz=matrix,
         max_workers=int(cfg.get("workers", 8)),
+        filters=filters,
     )
 
 

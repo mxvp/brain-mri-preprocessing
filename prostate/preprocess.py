@@ -95,11 +95,13 @@ def run(
     spacing_xyz: tuple = DEFAULT_SPACING_XYZ,
     matrix_size_xyz: tuple = DEFAULT_MATRIX_SIZE_XYZ,
     max_workers: int = 8,
+    filters: dict | None = None,
 ) -> Path:
     """Run the full preprocessing pass and write a parallel manifest."""
     organized_root    = Path(organized_root)
     preprocessed_root = Path(preprocessed_root)
     in_manifest = pd.read_csv(organized_root / "manifest.csv")
+    filters = filters or {}
     log.info(f"loaded {len(in_manifest)} rows from {organized_root}/manifest.csv")
     log.info(f"target spacing: {spacing_xyz}   matrix: {matrix_size_xyz}")
     log.info(f"output root:    {preprocessed_root}")
@@ -117,6 +119,18 @@ def run(
                      f"(prostate off-center → center crop misses it)")
             in_manifest = in_manifest[~in_manifest["wide_fov"].fillna(False).astype(bool)].reset_index(drop=True)
             log.info(f"  remaining: {len(in_manifest)} rows to preprocess")
+
+    # Optional subset filters — keep only rows matching the requested
+    # source / modality / view values. Each filter is a list; empty/None = no filter.
+    for col, values in [
+        ("source",   filters.get("sources")),
+        ("modality", filters.get("modalities")),
+        ("view",     filters.get("views")),
+    ]:
+        if values:
+            before = len(in_manifest)
+            in_manifest = in_manifest[in_manifest[col].isin(values)].reset_index(drop=True)
+            log.info(f"  filter {col} in {values}: {before} → {len(in_manifest)}")
 
     preprocessed_root.mkdir(parents=True, exist_ok=True)
     ok = fail = 0
