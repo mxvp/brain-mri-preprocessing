@@ -6,3 +6,4 @@ logs/
 brainles_preprocessing_*.log
 __pycache__/
 .venv/
+.DS_Store
