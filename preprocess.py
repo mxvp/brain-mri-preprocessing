@@ -197,6 +197,12 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
 
     preprocessor.run(log_file=log_dir / f"{subject_id}.log")
 
+    # Reorient every output to LPS — the encoder was trained on LPS volumes
+    # (UPENN/UCSF/BraTS-style) and the registration output sometimes inherits
+    # the input volume's orientation labels (e.g. CGGA inputs are LAS, output
+    # would be LAS without this step → A↔P flipped vs encoder expectation).
+    _reorient_outputs_to_lps([center_out] + list(moving_outs))
+
     # Clean up temp files (clipped + CoM-aligned)
     for p in [Path(center_info["path"])] + [Path(m["path"]) for m in moving_info]:
         for prefix in ("_cleaned_", "_com_aligned_"):
@@ -206,6 +212,17 @@ def preprocess_subject(subject: dict, output_dir: Path, device: str = "0"):
 
     elapsed = time.time() - t0
     log.info(f"Done {subject_id} ({elapsed:.1f}s)")
+
+
+def _reorient_outputs_to_lps(paths):
+    """In-place reorient each existing .nii.gz to LPS via SimpleITK."""
+    import SimpleITK as sitk
+    for p in paths:
+        if not Path(p).exists():
+            continue
+        img = sitk.ReadImage(str(p))
+        img = sitk.DICOMOrient(img, "LPS")
+        sitk.WriteImage(img, str(p))
 
 
 def preprocess_manifest(manifest_path: Path, output_dir: Path, device: str = "0"):

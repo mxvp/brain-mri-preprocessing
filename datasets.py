@@ -514,6 +514,71 @@ class Schizo(Dataset):
         return results
 
 
+class CGGA(Dataset):
+    """CGGA — Chinese Glioma Genome Atlas. Raw clinical mpMRI per subject.
+
+    Files: T1_bet.nii.gz, T2_bet.nii.gz, CE_bet.nii.gz (CE = T1 contrast-
+    enhanced = T1c).  Already BET-skull-stripped, but NOT in SRI24 — native
+    clinical slice stacks, thick 6 mm slices, LAS orientation, variable
+    in-plane shape.  Needs the SCHIZO-style pipeline: SS atlas + CoM align,
+    skip HD-BET, N4 + affine register to SRI24.
+
+    Patients missing the center T1 modality are dropped. Patients with
+    severely partial brain z-coverage (< 100 mm physical extent) are also
+    dropped — only one such case (CGGA_256) but the policy generalises.
+    """
+
+    name = "cgga"
+
+    MIN_Z_COVERAGE_MM = 100.0
+
+    def prepare(self, input_dir: Path, output_dir: Path) -> list[dict]:
+        import nibabel as nib
+
+        results = []
+        dropped_no_t1 = []
+        dropped_low_z = []
+        for subject_dir in sorted(input_dir.iterdir()):
+            if not subject_dir.is_dir() or subject_dir.name.startswith("."):
+                continue
+            t1 = subject_dir / "T1_bet.nii.gz"
+            if not t1.exists():
+                dropped_no_t1.append(subject_dir.name)
+                continue
+
+            # z-coverage gate: drop the partial-brain outliers.
+            try:
+                img = nib.load(t1)
+                z_extent_mm = float(img.shape[2] * img.header.get_zooms()[2])
+                if z_extent_mm < self.MIN_Z_COVERAGE_MM:
+                    dropped_low_z.append((subject_dir.name, z_extent_mm))
+                    continue
+            except Exception:
+                pass
+
+            moving = []
+            for src_name, mod in [("T2_bet.nii.gz", "t2"), ("CE_bet.nii.gz", "t1c")]:
+                p = subject_dir / src_name
+                if p.exists():
+                    moving.append({"modality": mod, "path": str(p)})
+
+            results.append({
+                "subject_id": f"CGGA_{subject_dir.name.replace('CGGA_', '')}",
+                "center": {"modality": "t1", "path": str(t1)},
+                "moving": moving,
+                "pre_skull_stripped": True,
+            })
+
+        log.info(f"CGGA: {len(results)} subjects")
+        if dropped_no_t1:
+            log.info(f"  dropped {len(dropped_no_t1)} subjects with no T1 center")
+        if dropped_low_z:
+            log.info(f"  dropped {len(dropped_low_z)} subjects with z-coverage < {self.MIN_Z_COVERAGE_MM} mm:")
+            for name, z in dropped_low_z:
+                log.info(f"    {name}: {z:.1f} mm")
+        return results
+
+
 class Stanford(Dataset):
     """Stanford — brain tumor dataset with T1Gd, FLAIR per subject."""
 
@@ -768,6 +833,7 @@ REGISTRY: dict[str, type[Dataset]] = {
     "ppmi": PPMI,
     "adni": ADNI,
     "schizo": Schizo,
+    "cgga": CGGA,
     "stanford": Stanford,
     "bids_defaced": BIDSDefaced,  # ABIDE I/II, NKI, CORR, FCON1000
     "fmriprep_mni": FmriprepMNI,  # ADHD200, CORR (fmriprep outputs)
