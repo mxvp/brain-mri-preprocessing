@@ -25,10 +25,7 @@ slurm_scripts/         # SLURM job scripts for HPC
   run_all.sh           # Submit all datasets
 
 prostate/              # Prostate MRI pipeline — separate CLI `python -m prostate`
-multimodal/            # Multi-modality experimental utilities + tests
 
-DATASET_CITATIONS.md   # Per-dataset citations
-DATA_REFERENCE.md      # Per-dataset file-layout reference (what's on disk, where)
 STATUS.md              # Per-dataset preprocessing status tracker
 pyproject.toml         # Dependencies (uv-managed)
 ```
