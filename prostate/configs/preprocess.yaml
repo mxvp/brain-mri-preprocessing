@@ -6,21 +6,23 @@ paths:
 workers: 8                # parallel SimpleITK conversions
 
 sources:
+  # Point each `root:` at your local copy of the raw source dataset.
+  # Paths can be absolute or repo-relative (resolved against the repo root).
   picai:
     enabled: true
-    root: <sanitized>/Documents/phd/projects/prostate-dt/data/picai/images
+    root: data/prostate/picai/images
     min_slices: 5
   tcia_biopsy:
     enabled: true
-    root: <sanitized>/Documents/phd/projects/prostate-dt/data/Prostate-MRI-US-Biopsy-NBIA-manifest_v2_20231020/nifti
+    root: data/prostate/Prostate-MRI-US-Biopsy/nifti
     min_slices: 5
   prostate158:
     enabled: true
-    root: <sanitized>/Documents/phd/projects/prostate-dt/data/prostate158
+    root: data/prostate/prostate158
     min_slices: 5
   promise12:
     enabled: true
-    root: <sanitized>/Documents/phd/projects/prostate-dt/data/promise12
+    root: data/prostate/promise12
     min_slices: 5
 
 # Patient-grouped, source-stratified train/val split.
