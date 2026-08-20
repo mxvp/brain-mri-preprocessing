@@ -61,7 +61,8 @@ def _pick(masks_root: Path, cohort: str, n: int, include: list[str], seed: int) 
 
 
 def render(masks_root: Path, prep_root: Path, out_png: Path,
-           n_per_cohort: int = 6, include: list[str] | None = None, seed: int = 0):
+           n_per_cohort: int = 6, include: list[str] | None = None, seed: int = 0,
+           overlay_only: bool = False):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -90,32 +91,47 @@ def render(masks_root: Path, prep_root: Path, out_png: Path,
     if not panels:
         raise SystemExit("nothing to render — check the masks/preprocessed paths")
 
-    ncol = 4
-    nrow = (len(panels) + ncol - 1) // ncol
+    # Side by side, each subject gets a clean slice next to the overlaid one —
+    # the mask hides the very pathology you're trying to confirm it sits on, so
+    # judging placement needs the unobstructed image alongside it.
+    pairs_per_row = 1 if overlay_only else 2
+    ncol = 4 if overlay_only else pairs_per_row * 2
+    nrow = (len(panels) + (ncol if overlay_only else pairs_per_row) - 1) // (
+        ncol if overlay_only else pairs_per_row)
     fig, axes = plt.subplots(nrow, ncol, figsize=(3.2 * ncol, 3.5 * nrow),
                              constrained_layout=True)
     axes = np.atleast_1d(axes).ravel()
 
-    for ax, (cohort, sid, img_p, msk_p, rep) in zip(axes, panels):
+    ax_i = 0
+    for cohort, sid, img_p, msk_p, rep in panels:
         img = np.asarray(nib.load(img_p).dataobj).astype(np.float32)
         msk = np.asarray(nib.load(msk_p).dataobj).astype(np.float32)
         # Slice with the most tumor — the most informative single view.
         per_slice = (msk > 0).sum(axis=(0, 1))
         z = int(per_slice.argmax()) if per_slice.max() else img.shape[2] // 2
 
-        sl_i, sl_m = img[:, :, z], msk[:, :, z]
+        sl_i, sl_m = np.rot90(img[:, :, z]), np.rot90(msk[:, :, z])
         nz = sl_i[sl_i != 0]
         vmin, vmax = (np.percentile(nz, [2, 98]) if nz.size else (0, 1))
-        ax.imshow(np.rot90(sl_i), cmap="gray", vmin=vmin, vmax=vmax)
-        ax.imshow(np.rot90(sl_m), cmap=cmap, vmin=0, vmax=4, interpolation="nearest")
 
         pct = rep.get("pct_inside_brain", "?")
         labs = sorted(int(v) for v in np.unique(msk) if v)
         flag = "" if rep.get("labels_match", "True") == "True" else "  [LABELS CHANGED]"
-        ax.set_title(f"{sid}\nz={z}  inside={pct}%  labels={labs}{flag}", fontsize=6.5)
+
+        if not overlay_only:
+            ax = axes[ax_i]; ax_i += 1
+            ax.imshow(sl_i, cmap="gray", vmin=vmin, vmax=vmax)
+            ax.set_title(f"{sid}\nz={z}  inside={pct}%  labels={labs}{flag}", fontsize=6.5)
+            ax.axis("off")
+
+        ax = axes[ax_i]; ax_i += 1
+        ax.imshow(sl_i, cmap="gray", vmin=vmin, vmax=vmax)
+        ax.imshow(sl_m, cmap=cmap, vmin=0, vmax=4, interpolation="nearest")
+        ax.set_title("+ mask" if not overlay_only
+                     else f"{sid}\nz={z}  inside={pct}%  labels={labs}{flag}", fontsize=6.5)
         ax.axis("off")
 
-    for ax in axes[len(panels):]:
+    for ax in axes[ax_i:]:
         ax.axis("off")
 
     fig.suptitle("Warped tumor masks over preprocessed volumes  "
@@ -133,9 +149,11 @@ if __name__ == "__main__":
     p.add_argument("--n-per-cohort", type=int, default=6, help="random subjects per cohort (on top of --include)")
     p.add_argument("--include", nargs="*", default=[], help="subject ids to force into the figure")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--overlay-only", action="store_true",
+                   help="Compact grid with just the overlaid slice (default shows clean|masked pairs)")
     args = p.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         datefmt="%H:%M:%S")
     render(args.masks_root, args.preprocessed_root, args.out_png,
-           args.n_per_cohort, args.include, args.seed)
+           args.n_per_cohort, args.include, args.seed, args.overlay_only)
