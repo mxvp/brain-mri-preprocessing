@@ -44,7 +44,14 @@ COHORTS = {
         "subject_id":    lambda d: d.name,
         "raw_ref":       lambda d: d / f"{d.name}_T1.nii.gz",
         "raw_ref_alt":   lambda d: d / f"{d.name}_T1GD.nii.gz",
-        "raw_mask":      lambda d: d / f"{d.name}_automated_approx_segm.nii.gz",
+        # Priority order. UPENN-GBM ships automated segmentations for every
+        # subject and expert-corrected ones for a subset; prefer the corrected
+        # version wherever it exists. `mask_kind` in the report records which
+        # was actually used, so the split is auditable after the fact.
+        "raw_masks": lambda d: [
+            ("manual",    d / f"{d.name}_segm.nii.gz"),
+            ("automated", d / f"{d.name}_automated_approx_segm.nii.gz"),
+        ],
         "prep_ref":      lambda sid: f"UPenn_{sid}_t1_preprocessed.nii.gz",
         "prep_ref_alt":  lambda sid: f"UPenn_{sid}_t1gd_preprocessed.nii.gz",
         "out_name":      lambda sid: f"UPenn_{sid}_segm_preprocessed.nii.gz",
@@ -54,7 +61,9 @@ COHORTS = {
         "subject_id":    lambda d: d.name.replace("_nifti", ""),
         "raw_ref":       lambda d: d / f"{d.name.replace('_nifti','')}_T1_bias.nii.gz",
         "raw_ref_alt":   lambda d: d / f"{d.name.replace('_nifti','')}_T1c_bias.nii.gz",
-        "raw_mask":      lambda d: d / f"{d.name.replace('_nifti','')}_tumor_segmentation.nii.gz",
+        "raw_masks": lambda d: [
+            ("tumor_seg", d / f"{d.name.replace('_nifti','')}_tumor_segmentation.nii.gz"),
+        ],
         "prep_ref":      lambda sid: f"{sid}_t1_preprocessed.nii.gz",
         "prep_ref_alt":  lambda sid: f"{sid}_t1c_preprocessed.nii.gz",
         "out_name":      lambda sid: f"{sid}_segm_preprocessed.nii.gz",
@@ -71,6 +80,14 @@ def _resolve(primary, alt):
     return None
 
 
+def _resolve_mask(spec, subject_dir):
+    """First existing mask in the cohort's priority order. Returns (kind, path)."""
+    for kind, path in spec["raw_masks"](subject_dir):
+        if path.exists():
+            return kind, path
+    return None, None
+
+
 def warp_one(subject_dir: Path, prep_dir: Path, out_dir: Path, cohort: str) -> dict:
     """Recover the raw->preprocessed transform and apply it to the mask."""
     import ants
@@ -85,8 +102,8 @@ def warp_one(subject_dir: Path, prep_dir: Path, out_dir: Path, cohort: str) -> d
     raw_ref = _resolve(spec["raw_ref"](subject_dir), spec["raw_ref_alt"](subject_dir))
     if raw_ref is None:
         return {"subject": sid, "status": "no raw reference image"}
-    raw_mask = spec["raw_mask"](subject_dir)
-    if not raw_mask.exists():
+    mask_kind, raw_mask = _resolve_mask(spec, subject_dir)
+    if raw_mask is None:
         return {"subject": sid, "status": "no mask"}
 
     # Match the preprocessed reference to whichever raw modality we resolved,
@@ -121,6 +138,8 @@ def warp_one(subject_dir: Path, prep_dir: Path, out_dir: Path, cohort: str) -> d
     return {
         "subject": sid,
         "status": "ok",
+        "mask_kind": mask_kind,
+        "ref_modality": raw_ref.name,
         "labels_in": labels_in,
         "labels_out": labels_out,
         "labels_match": labels_in == labels_out,
@@ -130,12 +149,73 @@ def warp_one(subject_dir: Path, prep_dir: Path, out_dir: Path, cohort: str) -> d
     }
 
 
+def dry_run(cohort: str, raw_root: Path, prep_dir: Path) -> int:
+    """Resolve every input path without registering anything.
+
+    Catches the failure modes that would otherwise only surface after a long
+    run (or not at all): a subject_glob that matches nothing, mask filenames
+    that differ from what this cohort spec expects, post-op subjects with no
+    preprocessed counterpart.
+    """
+    spec = COHORTS[cohort]
+    subject_dirs = sorted(
+        d for d in raw_root.glob(spec["subject_glob"])
+        if d.is_dir() and not d.name.startswith(".")
+    )
+    if not subject_dirs:
+        log.error(f"glob {spec['subject_glob']!r} matched NO dirs under {raw_root}")
+        log.error("  the cohort spec's subject_glob likely doesn't match this layout.")
+        log.error(f"  what's actually there: {[d.name for d in sorted(raw_root.iterdir())[:5] if d.is_dir()]}")
+        return 1
+
+    counts = {"ok": 0, "no raw ref": 0, "no mask": 0, "no preprocessed ref": 0}
+    examples = {k: [] for k in counts}
+    kind_counts: dict[str, int] = {}
+    for d in subject_dirs:
+        sid = spec["subject_id"](d)
+        raw_ref = _resolve(spec["raw_ref"](d), spec["raw_ref_alt"](d))
+        if raw_ref is None:
+            counts["no raw ref"] += 1; examples["no raw ref"].append(sid); continue
+        mask_kind, mask_path = _resolve_mask(spec, d)
+        if mask_path is None:
+            counts["no mask"] += 1; examples["no mask"].append(sid); continue
+        kind_counts[mask_kind] = kind_counts.get(mask_kind, 0) + 1
+        is_alt = raw_ref == spec["raw_ref_alt"](d)
+        prep = prep_dir / (spec["prep_ref_alt"](sid) if is_alt else spec["prep_ref"](sid))
+        if not prep.exists() and not (prep_dir / spec["prep_ref"](sid)).exists():
+            counts["no preprocessed ref"] += 1; examples["no preprocessed ref"].append(sid); continue
+        counts["ok"] += 1
+        if len(examples["ok"]) < 3:
+            examples["ok"].append(f"{sid}  [{raw_ref.name} -> {prep.name}]")
+
+    log.info(f"{cohort} DRY RUN: {len(subject_dirs)} subject dirs under {raw_root}")
+    for k, n in counts.items():
+        if not n:
+            continue
+        log.info(f"  {k:<22s} {n:>5d}")
+        for e in examples[k][:3]:
+            log.info(f"      e.g. {e}")
+        if len(examples[k]) > 3:
+            log.info(f"      ... and {len(examples[k])-3} more")
+    if kind_counts:
+        log.info(f"  mask flavours found: {kind_counts}")
+    if counts["ok"] == 0:
+        log.error("nothing would be processed — fix paths before the real run.")
+        return 1
+    return 0
+
+
 def run(cohort: str, raw_root: Path, prep_dir: Path, out_dir: Path, workers: int = 4):
     spec = COHORTS[cohort]
     subject_dirs = sorted(
         d for d in raw_root.glob(spec["subject_glob"])
         if d.is_dir() and not d.name.startswith(".")
     )
+    if not subject_dirs:
+        raise SystemExit(
+            f"glob {spec['subject_glob']!r} matched no dirs under {raw_root} — "
+            f"nothing to do. Run with --dry-run to inspect the layout."
+        )
     log.info(f"{cohort}: {len(subject_dirs)} subject dirs under {raw_root}")
     log.info(f"  preprocessed: {prep_dir}")
     log.info(f"  output:       {out_dir}")
@@ -170,7 +250,8 @@ def run(cohort: str, raw_root: Path, prep_dir: Path, out_dir: Path, workers: int
 
     import csv
     report = out_dir / "warp_report.csv"
-    keys = ["subject", "status", "labels_match", "pct_inside_brain", "vox_in", "vox_out"]
+    keys = ["subject", "status", "mask_kind", "ref_modality", "labels_match",
+            "pct_inside_brain", "vox_in", "vox_out"]
     with open(report, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=keys, extrasaction="ignore")
         w.writeheader()
@@ -186,6 +267,8 @@ if __name__ == "__main__":
     p.add_argument("preprocessed_dir", type=Path, help="Our preprocessed output dir for this cohort")
     p.add_argument("output_dir", type=Path, help="Where to write warped masks")
     p.add_argument("--workers", type=int, default=4)
+    p.add_argument("--dry-run", action="store_true",
+                   help="Resolve all input paths and report what would happen, without registering")
     args = p.parse_args()
 
     logging.basicConfig(
@@ -193,4 +276,6 @@ if __name__ == "__main__":
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%H:%M:%S",
     )
+    if args.dry_run:
+        raise SystemExit(dry_run(args.cohort, args.raw_root, args.preprocessed_dir))
     run(args.cohort, args.raw_root, args.preprocessed_dir, args.output_dir, args.workers)
