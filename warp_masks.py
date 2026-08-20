@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
 # recovered transform applies to the whole subject.
 COHORTS = {
     "upenn": {
-        "subject_glob":  "*",
+        "subject_glob":  "UPENN-GBM-*",
         "subject_id":    lambda d: d.name,
         "raw_ref":       lambda d: d / f"{d.name}_T1.nii.gz",
         "raw_ref_alt":   lambda d: d / f"{d.name}_T1GD.nii.gz",
@@ -57,7 +57,9 @@ COHORTS = {
         "out_name":      lambda sid: f"UPenn_{sid}_segm_preprocessed.nii.gz",
     },
     "ucsf": {
-        "subject_glob":  "*_nifti",
+        # Dirs are "UCSF-PDGM-0004" on disk; some TCIA copies use a
+        # "_nifti" suffix, so match both and strip it in subject_id.
+        "subject_glob":  "UCSF-PDGM-*",
         "subject_id":    lambda d: d.name.replace("_nifti", ""),
         "raw_ref":       lambda d: d / f"{d.name.replace('_nifti','')}_T1_bias.nii.gz",
         "raw_ref_alt":   lambda d: d / f"{d.name.replace('_nifti','')}_T1c_bias.nii.gz",
