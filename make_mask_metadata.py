@@ -56,6 +56,15 @@ def build(masks_root: Path, prep_root: Path):
     import nibabel as nib
     import numpy as np
 
+    # aligned_to is resolved by checking the preprocessed volumes exist. If
+    # prep_root is wrong the column silently comes out empty for every row and
+    # the output looks fine, so refuse up front instead.
+    if not prep_root.is_dir():
+        raise SystemExit(
+            f"preprocessed_root does not exist: {prep_root}\n"
+            "Run this where the preprocessed volumes live (aligned_to needs them)."
+        )
+
     rows, summary = [], {}
     for cohort, info in COHORT_INFO.items():
         cdir = masks_root / cohort
@@ -76,7 +85,7 @@ def build(masks_root: Path, prep_root: Path):
         log.info(f"{cohort}: measuring {len(masks)} masks")
 
         stats = {"n": 0, "labels_only_edema": 0, "labels_missing_necrotic": 0,
-                 "vols": [], "mask_kinds": {}}
+                 "vols": [], "mask_kinds": {}, "changes": []}
         for i, mp in enumerate(masks, 1):
             sid = mp.name[len(prefix):-len(suffix)]
             d = np.asarray(nib.load(mp).dataobj)
@@ -102,12 +111,18 @@ def build(masks_root: Path, prep_root: Path):
                 "vol_edema_mm3": per_label["edema"],
                 "vol_enhancing_mm3": per_label["enhancing"],
                 "vol_total_mm3": total,
+                "vol_change_pct": (
+                    f'{100*(int(rep["vox_out"])-int(rep["vox_in"]))/int(rep["vox_in"]):+.1f}'
+                    if rep.get("vox_in") and rep.get("vox_out") else ""),
                 "pct_inside_brain": rep.get("pct_inside_brain", ""),
                 "labels_preserved": rep.get("labels_match", ""),
             })
 
             stats["n"] += 1
             stats["vols"].append(total)
+            if rep.get("vox_in") and rep.get("vox_out"):
+                vi, vo = int(rep["vox_in"]), int(rep["vox_out"])
+                stats["changes"].append(100 * (vo - vi) / vi)
             if present == [2]:
                 stats["labels_only_edema"] += 1
             if 1 not in present:
@@ -117,10 +132,24 @@ def build(masks_root: Path, prep_root: Path):
             if i % 200 == 0:
                 log.info(f"  {i}/{len(masks)}")
 
+        ch = np.abs(stats["changes"]) if stats["changes"] else np.array([0.0])
+        stats["chg_abs_median"] = float(np.median(ch))
+        stats["chg_abs_p95"] = float(np.percentile(ch, 95))
+        stats["chg_abs_max"] = float(ch.max())
+        stats["chg_signed_median"] = float(np.median(stats["changes"])) if stats["changes"] else 0.0
+        stats["chg_n_shrank"] = int(sum(1 for c in stats["changes"] if c < 0))
         stats["vol_median"] = int(np.median(stats["vols"])) if stats["vols"] else 0
         stats["vol_min"] = int(min(stats["vols"])) if stats["vols"] else 0
         stats["vol_max"] = int(max(stats["vols"])) if stats["vols"] else 0
         summary[cohort] = stats
+
+    n_unaligned = sum(1 for r in rows if not r["aligned_to"])
+    if n_unaligned:
+        raise SystemExit(
+            f"{n_unaligned}/{len(rows)} subjects resolved no preprocessed volumes "
+            f"under {prep_root}.\nExpected e.g. {prep_root}/upenn/UPenn_<sid>_t1_preprocessed.nii.gz — "
+            "check the path points at the cohort dirs."
+        )
 
     rows.sort(key=lambda r: (r["cohort"], r["subject"]))
     manifest = masks_root / "tumor_masks_manifest.csv"
@@ -130,10 +159,10 @@ def build(masks_root: Path, prep_root: Path):
         w.writerows(rows)
     log.info(f"wrote {manifest}  ({len(rows)} rows)")
 
-    _write_readme(masks_root, summary)
+    _write_readme(masks_root, summary, prep_root)
 
 
-def _write_readme(masks_root: Path, summary: dict):
+def _write_readme(masks_root: Path, summary: dict, prep_root: Path):
     total = sum(s["n"] for s in summary.values())
     lines = [
         "# Tumor masks in preprocessed space",
@@ -174,7 +203,13 @@ def _write_readme(masks_root: Path, summary: dict):
         "Each mask is on the exact grid — 240x240x155, 1 mm isotropic — of that",
         "subject's preprocessed volumes. All modalities of a subject share one grid",
         "after preprocessing, so a mask is valid against any of them; the",
-        "`aligned_to` column lists which exist for that subject.",
+        "`aligned_to` column lists which exist for that subject. Those volumes are",
+        f"not in this directory — they live under `{prep_root}`.",
+        "",
+        "Masks are `float32` in **LAS** orientation, matching the volumes they pair",
+        "with. Load both the same way: if you canonicalise orientation on the volume",
+        "(e.g. MONAI `Orientationd`, `nib.as_closest_canonical`), apply the identical",
+        "transform to the mask or they will desynchronise.",
         "",
         "## Labels",
         "",
@@ -191,10 +226,27 @@ def _write_readme(masks_root: Path, summary: dict):
         "",
         "## Caveats",
         "",
-        "**Volumes are ~4% larger than the shipped masks.** Resampling a label map",
-        "onto a different grid with nearest-neighbour interpolation inflates it",
-        "slightly. Use these for localisation; for exact volumetry go back to the",
-        "source masks in the raw dataset.",
+        "**These are atlas-space volumes, not native ones.** Preprocessing affinely",
+        "registers each brain to SRI24, which scales it — so a mask carried through",
+        "that transform changes volume too. Measured against the shipped masks:",
+        "",
+        "| Cohort | median abs. change | p95 | max | shrank / grew |",
+        "|---|---:|---:|---:|---|",
+    ]
+    for c, s_ in summary.items():
+        lines.append(
+            f"| {COHORT_INFO[c]['full_name']} | {s_['chg_abs_median']:.1f}% | "
+            f"{s_['chg_abs_p95']:.1f}% | {s_['chg_abs_max']:.1f}% | "
+            f"{s_['chg_n_shrank']} / {s_['n'] - s_['chg_n_shrank']} |"
+        )
+    lines += [
+        "",
+        "The direction varies by subject — bigger heads scale down, smaller ones up —",
+        "so this is not a constant offset you can correct for. **Do not use these for",
+        "tumour volumetry.** Use them for localisation, overlap with the volumes they",
+        "ship beside, or as training targets; for true volumes go back to the source",
+        "masks in the raw dataset. `vol_change_pct` in the manifest gives the",
+        "per-subject figure.",
         "",
     ]
 
@@ -268,6 +320,7 @@ def _write_readme(masks_root: Path, summary: dict):
         r"| `labels_present` | label values in this mask, pipe-separated |",
         "| `vol_necrotic_mm3` / `vol_edema_mm3` / `vol_enhancing_mm3` | per-label volume (1 mm iso, so = voxel count) |",
         "| `vol_total_mm3` | all non-zero voxels |",
+        "| `vol_change_pct` | volume change vs the shipped mask, from atlas scaling |",
         "| `pct_inside_brain` | fraction of warped mask inside the brain mask |",
         "| `labels_preserved` | False if the label set changed during resampling |",
         "",
